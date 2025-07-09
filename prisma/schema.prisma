@@ -1,0 +1,101 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+    SUPER_ADMIN
+    ADMIN
+    EMPLOYEE
+    CUSTOMER
+}
+
+model User {
+    id         Int       @id @default(autoincrement())
+    name       String    @db.VarChar(20)
+    surname    String    @db.VarChar(20)
+    email      String    @unique @db.VarChar(20)
+    password   String    @db.VarChar(50)
+    address    String    @db.VarChar(50)
+    birthday   DateTime
+    createdAt  DateTime  @default(now())
+    isEnabled  Boolean
+    role       Role
+    addedById  Int?
+    addedBy    User?     @relation("UserAddedBy", fields: [addedById], references: [id])
+    addedUsers User[]    @relation("UserAddedBy")
+    products   Product[]
+    pictures   Picture[]
+    invoices   Invoice[] @relation("IssuedInvoices")
+}
+
+model Product {
+    id           Int            @id @default(autoincrement())
+    name         String         @db.VarChar(20)
+    category     String         @db.VarChar(20)
+    price        Float
+    description  String         @db.VarChar(100)
+    quantity     Int
+    addedById    Int
+    addedBy      User           @relation(fields: [addedById], references: [id])
+    createdAt    DateTime       @default(now())
+    isAvailable  Boolean
+    pictures     Picture[]      @relation("ProductPictures")
+    orderDetails OrderDetails[]
+}
+
+model Picture {
+    id          Int      @id @default(autoincrement())
+    url         String   @db.VarChar(50)
+    uploadedAt  DateTime @default(now())
+    addedById   Int
+    isThumbnail Boolean  @default(false)
+    addedBy     User     @relation(fields: [addedById], references: [id])
+    productId   Int?
+    product     Product? @relation("ProductPictures", fields: [productId], references: [id])
+}
+
+model Order {
+    id           Int            @id @default(autoincrement())
+    name         String         @db.VarChar(20)
+    surname      String         @db.VarChar(20)
+    email        String         @db.VarChar(20)
+    country      String         @db.VarChar(40)
+    city         String         @db.VarChar(20)
+    postalCode   String         @db.VarChar(20)
+    address      String         @db.VarChar(20)
+    totalPrice   Float
+    isDelivered  Boolean
+    isPaid       Boolean
+    createdAt    DateTime       @default(now())
+    orderDetails OrderDetails[]
+    invoice      Invoice?
+}
+
+model OrderDetails {
+    id         Int   @id @default(autoincrement())
+    orderId    Int
+    productId  Int
+    quantity   Int
+    price      Float
+    totalPrice Float
+
+    order   Order   @relation(fields: [orderId], references: [id])
+    product Product @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+    id         Int      @id @default(autoincrement())
+    orderId    Int      @unique
+    issuedById Int
+    createdAt  DateTime @default(now())
+    pdfUrl     String?
+
+    order    Order @relation(fields: [orderId], references: [id])
+    issuedBy User  @relation("IssuedInvoices", fields: [issuedById], references: [id])
+}
