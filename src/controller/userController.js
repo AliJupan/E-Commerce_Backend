@@ -67,7 +67,6 @@ class UserController {
             email,
           });
 
-          // You could return a JWT here if you have auth set up
           res.status(200).json({
             user: {
               id: user.id,

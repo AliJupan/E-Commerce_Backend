@@ -19,8 +19,8 @@ model User {
     id         Int       @id @default(autoincrement())
     name       String    @db.VarChar(20)
     surname    String    @db.VarChar(20)
-    email      String    @unique @db.VarChar(20)
-    password   String    @db.VarChar(50)
+    email      String    @unique @db.VarChar(50)
+    password   String    
     address    String    @db.VarChar(50)
     birthday   DateTime
     createdAt  DateTime  @default(now())
@@ -39,12 +39,11 @@ model Product {
     name         String         @db.VarChar(20)
     category     String         @db.VarChar(20)
     price        Float
-    description  String         @db.VarChar(100)
+    description  String         
     quantity     Int
     addedById    Int
     addedBy      User           @relation(fields: [addedById], references: [id])
     createdAt    DateTime       @default(now())
-    isAvailable  Boolean
     pictures     Picture[]      @relation("ProductPictures")
     orderDetails OrderDetails[]
 }
