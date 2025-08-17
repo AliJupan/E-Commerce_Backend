@@ -16,7 +16,7 @@ export default class ProductValidator extends BaseValidator {
       price: Joi.number().min(0).required(),
       description: Joi.string().required(),
       quantity: Joi.number().integer().min(0).required(),
-      addedById: Joi.number().integer().required(),
+      // addedById: Joi.number().integer().required(),
     });
 
     return this.validateAndContinue(schema);

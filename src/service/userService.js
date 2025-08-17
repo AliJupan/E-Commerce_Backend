@@ -1,92 +1,72 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import dayjs from "dayjs";
+import BaseService from "./BaseService.js";
 
-class UserService {
+class UserService extends BaseService {
   constructor(userRepository, emailService, logger) {
+    super(logger);
     this.userRepository = userRepository;
     this.emailService = emailService;
-    this.logger = logger;
   }
 
-  async registerUser(data) {
-    try {
-      let user = await this.userRepository.findUserByEmail(data.email);
-
-      if (user) {
-        this.logger.error({
-          module: "UserService",
-          fn: "registerUser",
-          message: "Email already exists",
+  registerUser(data) {
+    return this.wrapAsync("registerUser", async () => {
+      const existingUser = await this.userRepository.findUserByEmail(
+        data.email
+      );
+      if (existingUser) {
+        this.logError("registerUser", "Email already exists", {
           email: data.email,
         });
         return null;
       }
 
-      var randomstring = Math.random().toString(36).slice(-8);
+      let generatedPassword = null;
+      if (!data.password) {
+        generatedPassword = Math.random().toString(36).slice(-8);
+        data.password = generatedPassword;
+      }
 
-      const hashedPassword = await bcrypt.hash(randomstring, 10);
-      data.password = hashedPassword;
-      user = await this.userRepository.createUser(data);
+      data.password = await bcrypt.hash(data.password, 10);
+      data.birthday = dayjs(data.birthday).format("YYYY-MM-DDTHH:mm:ss[Z]");
 
-      if (user) {
-        this.emailService.sendRandomPassword(
+      const user = await this.userRepository.createUser(data);
+
+      if (user && generatedPassword) {
+        await this.emailService.sendRandomPassword(
           user.email,
           user.name,
-          randomstring
+          generatedPassword
         );
-        this.logger.info({
-          module: "UserService",
-          fn: "registerUser",
-          message: "User registered successfully",
-          email: data.email,
-        });
       }
-      return user;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "registerUser",
-        message: error.message,
+
+      this.logInfo("registerUser", "User registered successfully", {
         email: data.email,
       });
-      throw error;
-    }
-  }
-
-  async getUserByEmail(email) {
-    try {
-      const user = await this.userRepository.findUserByEmail(email);
-      this.logger.info({
-        module: "UserService",
-        fn: "getUserByEmail",
-        message: "User fetched by email",
-        email,
-      });
       return user;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "getUserByEmail",
-        message: error.message,
-        email,
-      });
-      throw error;
-    }
+    });
   }
 
-  async login(email, password, req) {
-    const ip =
-      req.ip || req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"];
-
-    try {
+  getUserByEmail(email) {
+    return this.wrapAsync("getUserByEmail", async () => {
       const user = await this.userRepository.findUserByEmail(email);
+      this.logInfo("getUserByEmail", "User fetched by email", { email });
+      return user;
+    });
+  }
 
+  login(email, password, req) {
+    return this.wrapAsync("login", async () => {
+      const ip =
+        req.ip ||
+        req.headers["x-forwarded-for"] ||
+        req.connection.remoteAddress;
+      const userAgent = req.headers["user-agent"];
+
+      const user = await this.userRepository.findUserByEmail(email);
       if (!user || !user.isEnabled) {
-        this.logger.warn({
-          module: "UserService",
-          fn: "login",
-          message: "Login failed: user not found or disabled",
+        this.logError("login", "Login failed: user not found or disabled", {
           email,
           ip,
           userAgent,
@@ -94,11 +74,9 @@ class UserService {
         throw new Error("Invalid email or password");
       }
 
-      if (!(await bcrypt.compare(password, user.password))) {
-        this.logger.warn({
-          module: "UserService",
-          fn: "login",
-          message: "Login failed: incorrect password",
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
+        this.logError("login", "Login failed: incorrect password", {
           email,
           ip,
           userAgent,
@@ -106,103 +84,56 @@ class UserService {
         throw new Error("Invalid email or password");
       }
 
-      this.logger.info({
-        module: "UserService",
-        fn: "login",
-        message: "User logged in successfully",
+      this.logInfo("login", "User logged in successfully", {
         email,
         ip,
         userAgent,
       });
-
       return user;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "login",
-        message: error.message,
-        email,
-        ip,
-        userAgent,
-      });
-      throw error;
-    }
+    });
   }
 
-  async getUserById(userId) {
-    try {
+  getUserById(userId) {
+    return this.wrapAsync("getUserById", async () => {
       const user = await this.userRepository.findUserById(userId);
-      this.logger.info({
-        module: "UserService",
-        fn: "getUserById",
-        message: "User fetched by ID",
-        userId,
-      });
+      this.logInfo("getUserById", "User fetched by ID", { userId });
       return user;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "getUserById",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async changeUserPassword(email, oldPassword, newPassword) {
-    try {
+  changeUserPassword(email, oldPassword, newPassword) {
+    return this.wrapAsync("changeUserPassword", async () => {
       const user = await this.userRepository.findUserByEmail(email);
-
       if (!user) {
-        this.logger.warn({
-          module: "UserService",
-          fn: "login",
-          message: "Login failed: user not found",
-          email,
-        });
+        this.logError("changeUserPassword", "User not found", { email });
         throw new Error("Invalid email or password");
       }
-      const isMatch = await bcrypt.compare(oldPassword, user.password);
 
+      const isMatch = await bcrypt.compare(oldPassword, user.password);
       if (!isMatch) {
-        this.logger.warn({
-          module: "UserService",
-          fn: "login",
-          message: "Login failed: incorrect password",
+        this.logError("changeUserPassword", "Incorrect old password", {
           email,
         });
         throw new Error("Invalid email or password");
       }
-      newPassword = await bcrypt.hash(newPassword, 10);
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
       const updated = await this.userRepository.updateUserPassword(
         email,
-        newPassword
+        hashedPassword
       );
-      this.logger.info({
-        module: "UserService",
-        fn: "changeUserPassword",
-        message: "Password updated successfully",
+
+      this.logInfo("changeUserPassword", "Password updated successfully", {
         email,
       });
       return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "changeUserPassword",
-        message: error.message,
-        email,
-      });
-      throw error;
-    }
+    });
   }
 
-  async forgotPassword(email) {
-    try {
+  forgotPassword(email) {
+    return this.wrapAsync("forgotPassword", async () => {
       const user = await this.userRepository.findUserByEmail(email);
-      if (!user) {
-        throw new Error(`Email not found: ${email}`);
-      }
+      if (!user) throw new Error(`Email not found: ${email}`);
 
       const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY, {
         expiresIn: "24h",
@@ -210,194 +141,102 @@ class UserService {
 
       await this.emailService.sendForgotPasswordMail(email, resetToken);
 
-      this.logger.info({
-        module: "UserService",
-        fn: "forgotPassword",
-        message: "Forgot password requested",
-        email,
-      });
-
+      this.logInfo("forgotPassword", "Password reset token sent", { email });
       return user;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "forgotPassword",
-        message: error.message,
-        email,
-      });
-      throw error;
-    }
+    });
   }
 
-  async resetPassword(token, newPassword) {
-    try {
+  resetPassword(token, newPassword) {
+    return this.wrapAsync("resetPassword", async () => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
       const userId = decoded.id;
-      if (!userId) {
-        throw new Error("Invalid token data");
-      }
-      newPassword = await bcrypt.hash(newPassword, 10);
+      if (!userId) throw new Error("Invalid token data");
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
       const updated = await this.userRepository.resetUserPassword(
         userId,
-        newPassword
+        hashedPassword
       );
-      this.logger.info({
-        module: "UserService",
-        fn: "resetPassword",
-        message: "Password reset successfully",
-        userId,
-      });
+
+      this.logInfo("resetPassword", "Password reset successfully", { userId });
       return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "resetPassword",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async listAllUsers(filters) {
-    try {
+  listAllUsers(filters) {
+    return this.wrapAsync("listAllUsers", async () => {
       if (filters.take) filters.take = parseInt(filters.take);
       if (filters.limit) filters.limit = parseInt(filters.limit);
+
       const users = await this.userRepository.getAllUsers(filters);
-      this.logger.info({
-        module: "UserService",
-        fn: "listAllUsers",
-        message: "Fetched all users",
+      this.logInfo("listAllUsers", "Fetched all users", {
         count: users.length,
       });
       return users;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "listAllUsers",
-        message: error.message,
-      });
-      throw error;
-    }
+    });
   }
 
-  async updateUser(userId, data) {
-    try {
+  updateUser(userId, data) {
+    return this.wrapAsync("updateUser", async () => {
       const updated = await this.userRepository.updateUser(userId, data);
-      this.logger.info({
-        module: "UserService",
-        fn: "updateUser",
-        message: "User updated successfully",
-        userId,
-      });
+      this.logInfo("updateUser", "User updated successfully", { userId });
       return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "updateUser",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async promoteToAdmin(userId) {
-    try {
+  promoteToAdmin(userId) {
+    return this.wrapAsync("promoteToAdmin", async () => {
       const updated = await this.userRepository.makeUserAdmin(userId);
-      this.logger.info({
-        module: "UserService",
-        fn: "promoteToAdmin",
-        message: "User promoted to ADMIN",
-        userId,
-      });
+      this.logInfo("promoteToAdmin", "User promoted to ADMIN", { userId });
       return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "promoteToAdmin",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async promoteToSuperAdmin(userId) {
-    try {
+  promoteToSuperAdmin(userId) {
+    return this.wrapAsync("promoteToSuperAdmin", async () => {
       const updated = await this.userRepository.makeUserSuperAdmin(userId);
-      this.logger.info({
-        module: "UserService",
-        fn: "promoteToSuperAdmin",
-        message: "User promoted to SUPER_ADMIN",
+      this.logInfo("promoteToSuperAdmin", "User promoted to SUPER_ADMIN", {
         userId,
       });
       return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "promoteToSuperAdmin",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async disableUser(id) {
-    try {
+  disableUser(id) {
+    return this.wrapAsync("disableUser", async () => {
       const user = await this.getUserById(id);
 
       if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-        this.logger.info({
-          module: "UserService",
-          fn: "disableUser",
-          message: `Cannot disable user with role: ${user.role}`,
-          userId: id,
-        });
-        return;
+        this.logInfo(
+          "disableUser",
+          `Cannot disable user with role: ${user.role}`,
+          { userId: id }
+        );
+        return null;
       }
 
       const disabledUser = await this.userRepository.disableUser(id);
-
-      this.logger.info({
-        module: "UserService",
-        fn: "disableUser",
-        message: "User disabled successfully",
-        userId: id,
-      });
-
+      this.logInfo("disableUser", "User disabled successfully", { userId: id });
       return disabledUser;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "disableUser",
-        message: error.message,
-        userId: id,
-      });
-      throw error;
-    }
+    });
   }
 
-  async removeUser(userId) {
-    try {
+  removeUser(userId) {
+    return this.wrapAsync("removeUser", async () => {
       const deleted = await this.userRepository.deleteUser(userId);
-      this.logger.info({
-        module: "UserService",
-        fn: "removeUser",
-        message: "User deleted successfully",
-        userId,
-      });
+      this.logInfo("removeUser", "User deleted successfully", { userId });
       return deleted;
-    } catch (error) {
-      this.logger.error({
-        module: "UserService",
-        fn: "removeUser",
-        message: error.message,
-        userId,
+    });
+  }
+
+  getAdmins() {
+    return this.wrapAsync("getAdmins", async () => {
+      const admins = await this.userRepository.getAdmins();
+      this.logInfo("getAdmins", "Fetched all admins", {
+        count: admins.length,
       });
-      throw error;
-    }
+      return admins;
+    });
   }
 }
 

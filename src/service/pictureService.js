@@ -1,138 +1,99 @@
-class PictureService {
+import path from "path";
+import BaseService from "./BaseService.js"; // Adjust path as needed
+
+class PictureService extends BaseService {
   constructor(pictureRepository, logger, fileUploadLib) {
+    super(logger);
     this.pictureRepository = pictureRepository;
     this.fileUploadLib = fileUploadLib;
-    this.logger = logger;
   }
 
-  async uploadAndSavePicture(picture, productId, isThumbnail,addedById) {
-    try {
+  uploadAndSavePicture(picture, productId, isThumbnail, addedById) {
+    return this.wrapAsync("uploadAndSavePicture", async () => {
       const uploaded = await this.fileUploadLib.upload(picture);
-
-      const pictureName = uploaded.fileID;
+      const originalExtension = path.extname(picture.name);
+      const pictureName = uploaded.fileID + originalExtension;
 
       const result = await this.pictureRepository.createPicture({
         url: pictureName,
         isThumbnail,
         productId,
-        addedById
+        addedById,
       });
 
-      this.logger.info({
-        module: "PictureService",
-        fn: "uploadAndSavePicture",
-        message: "Uploaded and saved picture",
+      this.logInfo("uploadAndSavePicture", "Uploaded and saved picture", {
         productId,
         isThumbnail,
         url: pictureName,
       });
 
       return result;
-    } catch (error) {
-      this.logger.error({
-        module: "PictureService",
-        fn: "uploadAndSavePicture",
-        message: "Failed to upload and save picture",
-        productId,
-        error: error.message,
-      });
-      throw error;
-    }
+    });
   }
 
-  async getPicturesByProductId(productId) {
-    try {
+  getPicturesByProductId(productId) {
+    return this.wrapAsync("getPicturesByProductId", async () => {
       const result = await this.pictureRepository.getPicturesByProductId(
         productId
       );
 
-      this.logger.info({
-        module: "PictureService",
-        fn: "getPicturesByProductId",
-        message: "Fetched pictures by product ID",
+      this.logInfo("getPicturesByProductId", "Fetched pictures by product ID", {
         productId,
       });
 
       return result;
-    } catch (error) {
-      this.logger.error({
-        module: "PictureService",
-        fn: "getPicturesByProductId",
-        message: "Failed to get pictures",
-        listingId,
-        error: error.message,
-      });
-      throw error;
-    }
+    });
   }
 
-  async updateIsThumbnail(id) {
-    try {
-      const currentPic = await this.pictureRepository.getPictureById(id);
+  getThumbnailByProductId(productId) {
+    return this.wrapAsync("getThumbnailByProductId", async () => {
+      const result = await this.pictureRepository.getThumbnailByProductId(
+        productId
+      );
 
-      if (!currentPic) {
-        throw new Error(`Picture with id ${id} not found`);
-      }
-
-      if (!currentPic.isThumbnail) {
-        const otherPictures =
-          await this.pictureRepository.getPicturesByProductId(
-            currentPic.productId
-          );
-
-        for (const pic of otherPictures) {
-          if (pic.isThumbnail && pic.id !== id) {
-            await this.pictureRepository.updateIsThumbnail(pic.id);
-          }
+      this.logInfo(
+        "getThumbnailByProductId",
+        "Fetched thumbnail by product ID",
+        {
+          productId,
         }
-      }
-
-      const result = await this.pictureRepository.updateIsThumbnail(id);
-
-      this.logger.info({
-        module: "PictureService",
-        fn: "updateIsThumbnail",
-        message: "Toggled isThumbnail",
-        id,
-        isThumbnail: result.isThumbnail,
-      });
+      );
 
       return result;
-    } catch (error) {
-      this.logger.error({
-        module: "PictureService",
-        fn: "updateIsThumbnail",
-        message: "Failed to toggle isThumbnail",
-        id,
-        error: error.message,
-      });
-      throw error;
-    }
+    });
   }
 
-  async deletePicture(id) {
-    try {
+  async toggleIsThumbnail(pictureId) {
+    const currentPic = await this.pictureRepository.getPictureById(pictureId);
+    if (!currentPic) throw new Error(`Picture with id ${pictureId} not found`);
+
+    // If current picture is NOT a thumbnail, find any other thumbnails and unset them
+    if (!currentPic.isThumbnail) {
+      const otherPictures = await this.pictureRepository.getPicturesByProductId(
+        currentPic.productId
+      );
+      for (const pic of otherPictures) {
+        if (pic.isThumbnail && pic.id !== pictureId) {
+          // Unset other thumbnails by toggling them off only if they are ON
+          await this.pictureRepository.toggleIsThumbnail(pic.id);
+        }
+      }
+    }
+
+    // Toggle the thumbnail flag for current picture
+    const result = await this.pictureRepository.toggleIsThumbnail(pictureId);
+
+    this.logger.info("toggleIsThumbnail", "Toggled isThumbnail", {
+      id: pictureId,
+      isThumbnail: result.isThumbnail,
+    });
+
+    return result;
+  }
+
+  deletePicture(id) {
+    return this.wrapAsync("deletePicture", async () => {
       const picture = await this.pictureRepository.getPictureById(id);
-
-      //   const marker = "/listing-images";
-      //   const idx = picture.url.indexOf(marker);
-
-      //   const relativePath =
-      //     idx !== -1 ? picture.url.substring(idx + marker.length) : null;
-
-      //   if (relativePath) {
-      //     const cleanPath = relativePath.startsWith("/")
-      //       ? relativePath.slice(1)
-      //       : relativePath;
-      //     await this.fileUploadLib.delete(cleanPath);
-      //   } else {
-      //     this.logger.warn({
-      //       module: "PictureService",
-      //       fn: "deletePicture",
-      //       message: "Invalid picture URL path",
-      //       url: picture.url,
-      //     });
-      //   }
 
       await this.fileUploadLib.delete(picture.url);
       await this.pictureRepository.deletePicture(id);
@@ -145,40 +106,25 @@ class PictureService {
           const newThumbnail = otherPictures[0];
           await this.updateIsThumbnail(newThumbnail.id);
 
-          this.logger.info({
-            module: "PictureService",
-            fn: "deletePicture",
-            message: "Assigned new thumbnail after deletion",
-            productId: picture.productId,
-            newThumbnailId: newThumbnail.id,
-          });
+          this.logInfo(
+            "deletePicture",
+            "Assigned new thumbnail after deletion",
+            {
+              productId: picture.productId,
+              newThumbnailId: newThumbnail.id,
+            }
+          );
         }
       }
 
-      this.logger.info({
-        module: "PictureService",
-        fn: "deletePicture",
-        message: "Deleted picture",
-        id,
-      });
-
+      this.logInfo("deletePicture", "Deleted picture", { id });
       return { success: true };
-    } catch (error) {
-      this.logger.error({
-        module: "PictureService",
-        fn: "deletePicture",
-        message: "Failed to delete picture",
-        id,
-        error: error.message,
-      });
-      throw error;
-    }
+    });
   }
 
-  async deletePicturesByProductId(productId) {
-    try {
+  deletePicturesByProductId(productId) {
+    return this.wrapAsync("deletePicturesByProductId", async () => {
       const pictures = await this.getPicturesByProductId(productId);
-
       for (const pic of pictures) {
         await this.fileUploadLib.delete(pic.url);
       }
@@ -187,25 +133,17 @@ class PictureService {
         productId
       );
 
-      this.logger.info({
-        module: "PictureService",
-        fn: "deletePicturesByProductId",
-        message: "Deleted all pictures for product",
-        productId,
-        count: pictures.length,
-      });
+      this.logInfo(
+        "deletePicturesByProductId",
+        "Deleted all pictures for product",
+        {
+          productId,
+          count: pictures.length,
+        }
+      );
 
       return result;
-    } catch (error) {
-      this.logger.error({
-        module: "PictureService",
-        fn: "deletePicturesByListingId",
-        message: "Failed to delete pictures for listing",
-        listingId,
-        error: error.message,
-      });
-      throw error;
-    }
+    });
   }
 }
 

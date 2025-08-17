@@ -1,189 +1,175 @@
-class ProductController {
+import BaseController from "./BaseController.js";
+
+class ProductController extends BaseController {
   constructor(productService, logger) {
+    super(logger, "ProductController");
     this.productService = productService;
-    this.logger = logger;
+  }
+
+  validateDocumentType(file) {
+    const validTypes = ["image/jpeg", "image/png", "image/gif"];
+    return validTypes.includes(file.mimetype);
   }
 
   createProduct() {
-    return [
-      async (req, res) => {
-        try {
-          const data  = req.body;
-          const pictures = req.files.pictures || [];
-          const thumbnail = req.files.thumbnail || null;
-          const product = await this.productService.createProduct(data, pictures, thumbnail);
+    return this.handleRequest("createProduct", async (req) => {
+      const data = req.body;
+      let pictures = req.files?.pictures || [];
+      const thumbnail = req.files?.thumbnail || null;
+      data.addedById = req.user.id;
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "createProduct",
-            message: "Product created successfully",
-            name: data.name,
-            addedById: data.addedById,
-          });
+      if (!Array.isArray(pictures)) pictures = [pictures];
 
-          res.status(201).json(product);
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "createProduct",
-            message: error.message,
-            name: req.body.name,
-          });
-
-          res.status(500).json({ error: error.message });
+      for (const pic of pictures) {
+        if (!this.validateDocumentType(pic)) {
+          return {
+            status: 400,
+            data: {
+              error: `Invalid file type for ${pic.name}. Only JPEG, PNG, and GIF are allowed.`,
+            },
+          };
         }
-      },
-    ];
+      }
+
+      if (thumbnail) {
+        if (Array.isArray(thumbnail)) {
+          return {
+            status: 400,
+            data: { error: "Only one thumbnail file is allowed." },
+          };
+        }
+        if (!this.validateDocumentType(thumbnail)) {
+          return {
+            status: 400,
+            data: {
+              error: `Invalid file type for ${thumbnail.name}. Only JPEG, PNG, and GIF are allowed.`,
+            },
+          };
+        }
+      }
+
+      const product = await this.productService.createProduct(
+        data,
+        pictures,
+        thumbnail
+      );
+
+      this.logInfo("createProduct", "Product created successfully", {
+        name: data.name,
+        addedById: data.addedById,
+      });
+
+      return { status: 201, data: product };
+    });
   }
 
   getProductById() {
-    return [
-      async (req, res) => {
-        try {
-          const { id } = req.params;
-          const product = await this.productService.getProductById(id);
+    return this.handleRequest("getProductById", async (req) => {
+      const { id } = req.params;
+      const product = await this.productService.getProductById(id);
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "getProductById",
-            message: "Fetched product by ID",
-            productId: id,
-          });
-
-          res.status(200).json(product);
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "getProductById",
-            message: error.message,
-            productId: req.params.id,
-          });
-
-          res.status(500).json({ error: error.message });
-        }
-      },
-    ];
+      this.logInfo("getProductById", "Fetched product by ID", {
+        productId: id,
+      });
+      return { data: product };
+    });
   }
 
   getAllProducts() {
-    return [
-      async (req, res) => {
-        try {
-          const filters = req.query;
-          const products = await this.productService.listAllProducts(filters);
+    return this.handleRequest("getAllProducts", async (req) => {
+      const filters = req.query;
+      const products = await this.productService.listAllProducts(filters);
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "getAllProducts",
-            message: "All products fetched",
-            count: products.length,
-          });
+      this.logInfo("getAllProducts", "All products fetched", {
+        count: products.length,
+      });
 
-          res.status(200).json(products);
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "getAllProducts",
-            message: error.message,
-          });
-
-          res.status(500).json({ error: error.message });
-        }
-      },
-    ];
+      return { data: products };
+    });
   }
 
   updateProduct() {
-    return [
-      async (req, res) => {
-        try {
-          const { id } = req.params;
-          const data = req.body;
+    return this.handleRequest("updateProduct", async (req) => {
+      const { id } = req.params;
+      const data = req.body;
+      let pictures = req.files?.pictures || [];
+      const thumbnail = req.files?.thumbnail || null;
 
-          const updated = await this.productService.updateProduct(id, data);
+      if (!Array.isArray(pictures)) pictures = [pictures];
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "updateProduct",
-            message: "Product updated successfully",
-            productId: id,
-          });
-
-          res.status(200).json(updated);
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "updateProduct",
-            message: error.message,
-            productId: req.params.id,
-          });
-
-          res.status(500).json({ error: error.message });
+      for (const pic of pictures) {
+        if (!this.validateDocumentType(pic)) {
+          return {
+            status: 400,
+            data: {
+              error: `Invalid file type for ${pic.name}. Only JPEG, PNG, and GIF are allowed.`,
+            },
+          };
         }
-      },
-    ];
+      }
+
+      if (thumbnail) {
+        if (Array.isArray(thumbnail)) {
+          return {
+            status: 400,
+            data: { error: "Only one thumbnail file is allowed." },
+          };
+        }
+        if (!this.validateDocumentType(thumbnail)) {
+          return {
+            status: 400,
+            data: {
+              error: `Invalid file type for ${thumbnail.name}. Only JPEG, PNG, and GIF are allowed.`,
+            },
+          };
+        }
+      }
+
+      const updated = await this.productService.updateProduct(
+        id,
+        data,
+        pictures,
+        thumbnail,
+        req.user.id
+      );
+
+      this.logInfo("updateProduct", "Product updated successfully", {
+        productId: id,
+      });
+
+      return { data: updated };
+    });
   }
 
   deleteProduct() {
-    return [
-      async (req, res) => {
-        try {
-          const { id } = req.params;
+    return this.handleRequest("deleteProduct", async (req) => {
+      const { id } = req.params;
+      await this.productService.deleteProduct(id);
 
-          await this.productService.deleteProduct(id);
+      this.logInfo("deleteProduct", "Product deleted successfully", {
+        productId: id,
+      });
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "deleteProduct",
-            message: "Product deleted successfully",
-            productId: id,
-          });
-
-          res.status(200).json({ message: `Product ${id} deleted successfully` });
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "deleteProduct",
-            message: error.message,
-            productId: req.params.id,
-          });
-
-          res.status(500).json({ error: error.message });
-        }
-      },
-    ];
+      return { data: { message: `Product ${id} deleted successfully` } };
+    });
   }
 
   getProductsByUser() {
-    return [
-      async (req, res) => {
-        try {
-          const { userId } = req.params;
-          const filters = req.query;
+    return this.handleRequest("getProductsByUser", async (req) => {
+      const { userId } = req.params;
+      const filters = req.query;
+      const products = await this.productService.getProductsByUser(
+        userId,
+        filters
+      );
 
-          const products = await this.productService.getProductsByUser(userId, filters);
+      this.logInfo("getProductsByUser", "Fetched products by user", {
+        userId,
+        count: products.length,
+      });
 
-          this.logger.info({
-            module: "ProductController",
-            fn: "getProductsByUser",
-            message: "Fetched products by user",
-            userId,
-            count: products.length,
-          });
-
-          res.status(200).json(products);
-        } catch (error) {
-          this.logger.error({
-            module: "ProductController",
-            fn: "getProductsByUser",
-            message: error.message,
-            userId: req.params.userId,
-          });
-
-          res.status(500).json({ error: error.message });
-        }
-      },
-    ];
+      return { data: products };
+    });
   }
 }
 

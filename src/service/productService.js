@@ -1,171 +1,122 @@
-class ProductService {
+import BaseService from "./BaseService.js";
+
+class ProductService extends BaseService {
   constructor(productRepository, pictureService, logger) {
+    super(logger);
     this.productRepository = productRepository;
-    this.logger = logger;
     this.pictureService = pictureService;
   }
 
-  async createProduct(data, pictures, thumbnail) {
-    try {
-      const product = await this.productRepository.createProduct(data);
+  normalizeFilters(filters) {
+    if (filters.page) filters.page = parseInt(filters.page);
+    if (filters.limit) filters.limit = parseInt(filters.limit);
+    return filters;
+  }
 
-      if (thumbnail) {
+  async handlePictures(productId, addedById, pictures, thumbnail) {
+    if (thumbnail) {
+      await this.pictureService.uploadAndSavePicture(
+        thumbnail,
+        productId,
+        true,
+        addedById
+      );
+    }
+    const picturesArray = Array.isArray(pictures) ? pictures : [pictures];
+    for (const picture of picturesArray) {
+      if (picture) {
         await this.pictureService.uploadAndSavePicture(
-          thumbnail,
-          product.id,
-          true,
-          data.addedById
+          picture,
+          productId,
+          false,
+          addedById
         );
       }
+    }
+  }
 
-      const picturesArray = Array.isArray(pictures) ? pictures : [pictures];
-      for (const picture of picturesArray) {
-        if (picture) {
-          await this.pictureService.uploadAndSavePicture(
-            picture,
-            product.id,
-            false,
-            data.addedById
-          );
+  createProduct(data, pictures, thumbnail) {
+    return this.wrapAsync("createProduct", async () => {
+      const product = await this.productRepository.createProduct(data);
+      await this.handlePictures(
+        product.id,
+        data.addedById,
+        pictures,
+        thumbnail
+      );
+      return product;
+    });
+  }
+
+  getProductById(productId) {
+    return this.wrapAsync("getProductById", () =>
+      this.productRepository.getProductById(this.parseId(productId))
+    );
+  }
+
+  listAllProducts(filters) {
+    return this.wrapAsync("listAllProducts", () =>
+      this.productRepository.getAllProducts(this.normalizeFilters(filters))
+    );
+  }
+
+  updateProduct(id, data, pictures, thumbnail, addedById) {
+    return this.wrapAsync("updateProduct", async () => {
+      const parsedId = this.parseId(id);
+      const parsedAddedById = this.parseId(addedById);
+      if (thumbnail) {
+        const oldThumbnails = await this.pictureService.getThumbnailByProductId(
+          parsedId
+        );
+        for (const oldThumbnail of oldThumbnails) {
+          await this.pictureService.toggleIsThumbnail(oldThumbnail.id);
         }
       }
-
-      this.logger.info({
-        module: "ProductService",
-        fn: "createProduct",
-        message: "Product created successfully",
-        addedById: data.addedById,
-      });
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "createProduct",
-        message: error.message,
-      });
-      throw error;
-    }
+      await this.handlePictures(parsedId, parsedAddedById, pictures, thumbnail);
+      return this.productRepository.updateProduct(parsedId, data || {});
+    });
   }
 
-  async getProductById(productId) {
-    try {
+  deleteProduct(productId) {
+    return this.wrapAsync("deleteProduct", async () => {
+      const parsedId = this.parseId(productId);
+      await this.pictureService.deletePicturesByProductId(parsedId);
+      return this.productRepository.deleteProduct(parsedId);
+    });
+  }
+
+  getProductsByUser(userId, filters = {}) {
+    return this.wrapAsync("getProductsByUser", () =>
+      this.productRepository.getProductsByUser(
+        this.parseId(userId),
+        this.normalizeFilters(filters)
+      )
+    );
+  }
+
+  async updateProductQuantity(productId, quantityOrdered) {
+    return this.wrapAsync("updateProductQuantity", async () => {
       const product = await this.productRepository.getProductById(productId);
-      this.logger.info({
-        module: "ProductService",
-        fn: "getProductById",
-        message: "Fetched product by ID",
-        productId,
+      if (!product) throw new Error(`Product with ID ${productId} not found`);
+
+      const newQuantity = product.quantity - quantityOrdered;
+      if (newQuantity < 0) throw new Error("Quantity cannot be negative");
+
+      return this.productRepository.updateProduct(productId, {
+        quantity: newQuantity,
       });
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "getProductById",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
+    });
   }
 
-  async listAllProducts(filters) {
-    try {
-      if (filters.page) filters.page = parseInt(filters.page);
-      if (filters.limit) filters.limit = parseInt(filters.limit);
-
-      const products = await this.productRepository.getAllProducts(filters);
-
-      this.logger.info({
-        module: "ProductService",
-        fn: "listAllProducts",
-        message: "Fetched all products",
-        count: products.length,
-      });
-
-      return products;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "listAllProducts",
-        message: error.message,
-      });
-      throw error;
+  async getProductsByIds(productIds) {
+    const products = [];
+    for (const id of productIds) {
+      const product = await this.getProductById(id);
+      if (product) {
+        products.push(product);
+      }
     }
-  }
-
-  async updateProduct(productId, data) {
-    try {
-      const updated = await this.productRepository.updateProduct(
-        productId,
-        data
-      );
-      this.logger.info({
-        module: "ProductService",
-        fn: "updateProduct",
-        message: "Product updated successfully",
-        productId,
-      });
-      return updated;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "updateProduct",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
-  }
-
-  async deleteProduct(productId) {
-    try {
-      const deleted = await this.productRepository.deleteProduct(productId);
-      this.logger.info({
-        module: "ProductService",
-        fn: "deleteProduct",
-        message: "Product deleted successfully",
-        productId,
-      });
-      return deleted;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "deleteProduct",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
-  }
-
-  async getProductsByUser(userId, filters = {}) {
-    try {
-      if (filters.page) filters.page = parseInt(filters.page);
-      if (filters.limit) filters.limit = parseInt(filters.limit);
-
-      const products = await this.productRepository.getProductsByUser(
-        userId,
-        filters
-      );
-
-      this.logger.info({
-        module: "ProductService",
-        fn: "getProductsByUser",
-        message: "Fetched products by user ID",
-        userId,
-        count: products.length,
-      });
-
-      return products;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductService",
-        fn: "getProductsByUser",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    return products;
   }
 }
 

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-    provider  = "postgresql"
+    provider  = "mysql"
     url       = env("DATABASE_URL")
     directUrl = env("DIRECT_URL")
 }
@@ -31,7 +31,6 @@ model User {
     addedUsers User[]    @relation("UserAddedBy")
     products   Product[]
     pictures   Picture[]
-    invoices   Invoice[] @relation("IssuedInvoices")
 }
 
 model Product {
@@ -55,7 +54,7 @@ model Picture {
     addedById   Int
     isThumbnail Boolean  @default(false)
     addedBy     User     @relation(fields: [addedById], references: [id])
-    productId   Int?
+    productId   Int
     product     Product? @relation("ProductPictures", fields: [productId], references: [id])
 }
 
@@ -63,7 +62,7 @@ model Order {
     id           Int            @id @default(autoincrement())
     name         String         @db.VarChar(20)
     surname      String         @db.VarChar(20)
-    email        String         @db.VarChar(20)
+    email        String         @db.VarChar(50)
     country      String         @db.VarChar(40)
     city         String         @db.VarChar(20)
     postalCode   String         @db.VarChar(20)
@@ -91,10 +90,8 @@ model OrderDetails {
 model Invoice {
     id         Int      @id @default(autoincrement())
     orderId    Int      @unique
-    issuedById Int
     createdAt  DateTime @default(now())
     pdfUrl     String?
 
     order    Order @relation(fields: [orderId], references: [id])
-    issuedBy User  @relation("IssuedInvoices", fields: [issuedById], references: [id])
 }

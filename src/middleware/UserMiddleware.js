@@ -11,7 +11,11 @@ class UserMiddleware {
         }
 
         // Allow if the user is accessing their own data or if the user is an ADMIN
-        if (req.user.id == userId) {
+        if (
+          req.user.id == userId ||
+          req.user.role === "ADMIN" ||
+          req.user.role === "SUPER_ADMIN"
+        ) {
           next();
         } else {
           return res.status(403).json({ error: "Unauthorized access" });

@@ -1,186 +1,87 @@
 class ProductRepository {
-  constructor(prismaClient, logger) {
+  constructor(prismaClient) {
     this.prisma = prismaClient;
-    this.logger = logger;
+    this.productIncludes = {
+      pictures: true,
+      addedBy: { select: { id: true } },
+    };
   }
 
   async createProduct(data) {
-    try {
-      data.price = parseFloat(data.price);
-      data.quantity = parseInt(data.quantity);
-      data.addedById = parseInt(data.addedById);
-      const product = await this.prisma.product.create({ data });
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "createProduct",
-        message: "Product created successfully",
-        name: data.name,
-        addedById: data.addedById,
-      });
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "createProduct",
-        message: error.message,
-        name: data.name,
-      });
-      throw error;
-    }
+    const prepared = {
+      ...data,
+      price: data.price !== undefined ? parseFloat(data.price) : undefined,
+      quantity:
+        data.quantity !== undefined ? parseInt(data.quantity, 10) : undefined,
+      addedById:
+        data.addedById !== undefined ? parseInt(data.addedById, 10) : undefined,
+    };
+
+    const product = await this.prisma.product.create({ data: prepared });
+    return product;
   }
 
   async getProductById(productId) {
-    try {
-      const id = parseInt(productId);
-      const product = await this.prisma.product.findUnique({
-        where: { id },
-        include: {
-          pictures: true,
-          addedBy: true,
-        },
-      });
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "getProductById",
-        message: "Product fetched by ID",
-        productId: id,
-      });
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "getProductById",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
+    const id = parseInt(productId, 10);
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: this.productIncludes,
+    });
+    return product;
   }
 
-  async getAllProducts({ page = 1, limit = 10 }) {
-    try {
-      const products = await this.prisma.product.findMany({
-        where: {
-          quantity: {
-            gt: 0,
-          },
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          name: true,
-          category: true,
-          price: true,
-          pictures: {
-            where: {
-              isThumbnail: true,
-            },
-            select: {
-              url: true,
-            },
-          },
-        },
-      });
+  async getAllProducts({ page = 1, limit = 10, where = {} } = {}) {
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
 
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "getAllProducts",
-        message: "All products fetched",
-        count: products.length,
-      });
-
-      return products;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "getAllProducts",
-        message: error.message,
-      });
-      throw error;
-    }
+    const products = await this.prisma.product.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        price: true,
+        pictures: {
+          where: { isThumbnail: true },
+          select: { url: true },
+        },
+      },
+    });
+    return products;
   }
 
   async updateProduct(productId, data) {
-    try {
-      const id = parseInt(productId);
-      const product = await this.prisma.product.update({
-        where: { id },
-        data,
-      });
-
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "updateProduct",
-        message: "Product updated",
-        productId: id,
-      });
-
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "updateProduct",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
+    const id = parseInt(productId, 10);
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data,
+      include: this.productIncludes,
+    });
+    return updated;
   }
 
   async deleteProduct(productId) {
-    try {
-      const id = parseInt(productId);
-      const product = await this.prisma.product.delete({ where: { id } });
-
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "deleteProduct",
-        message: "Product deleted",
-        productId: id,
-      });
-
-      return product;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "deleteProduct",
-        message: error.message,
-        productId,
-      });
-      throw error;
-    }
+    const id = parseInt(productId, 10);
+    const deleted = await this.prisma.product.delete({ where: { id } });
+    return deleted;
   }
 
-  async getProductsByUser(userId, { page = 1, limit = 10 }) {
-    try {
-      const id = parseInt(userId);
-      const products = await this.prisma.product.findMany({
-        where: { addedById: id },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-      });
+  async getProductsByUser(userId, { page = 1, limit = 10 } = {}) {
+    const id = parseInt(userId, 10);
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
 
-      this.logger.info({
-        module: "ProductRepository",
-        fn: "getProductsByUser",
-        message: "Products by user fetched",
-        userId: id,
-        count: products.length,
-      });
-
-      return products;
-    } catch (error) {
-      this.logger.error({
-        module: "ProductRepository",
-        fn: "getProductsByUser",
-        message: error.message,
-        userId,
-      });
-      throw error;
-    }
+    const products = await this.prisma.product.findMany({
+      where: { addedById: id },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: this.productIncludes,
+    });
+    return products;
   }
 }
 

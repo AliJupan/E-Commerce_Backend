@@ -4,6 +4,12 @@ class RoleMiddleware {
       async (req, res, next) => {
         const userRole = req.user?.role;
 
+        if (!userRole) {
+          return res
+            .status(401)
+            .json({ message: "Token is missing or invalid" });
+        }
+
         if (
           userRole === "ADMIN" ||
           userRole === "SUPER_ADMIN" ||
@@ -22,10 +28,16 @@ class RoleMiddleware {
       async (req, res, next) => {
         const userRole = req.user?.role;
 
+        if (!userRole) {
+          return res
+            .status(401)
+            .json({ message: "Token is missing or invalid" });
+        }
+
         if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
           next();
         } else {
-          return res.status(403).json({ message: "Admins only" });
+          return res.status(403).json({ message: "Unauthorized access" });
         }
       },
     ];

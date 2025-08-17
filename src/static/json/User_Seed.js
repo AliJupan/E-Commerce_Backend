@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 
 export default async () => [
   {
-    id: 1,
     name: "Admin",
     surname: "Admin",
     email: "alizhupani2002@gmail.com",
