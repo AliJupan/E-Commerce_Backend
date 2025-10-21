@@ -45,6 +45,23 @@ class OrderRepository {
     });
   }
 
+  async getOrdersByUserId(userId) {
+    return this.prisma.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        orderDetails: {
+          include: {
+            product: {
+              select: { id: true, name: true, price: true, category: true },
+            },
+          },
+        },
+        invoice: true,
+      },
+    });
+  }
+
   async getAllOrders() {
     return this.prisma.order.findMany({
       orderBy: { createdAt: "desc" },

@@ -10,6 +10,8 @@ class ProductService extends BaseService {
   normalizeFilters(filters) {
     if (filters.page) filters.page = parseInt(filters.page);
     if (filters.limit) filters.limit = parseInt(filters.limit);
+    if (filters.maxPrice) filters.maxPrice = parseFloat(filters.maxPrice);
+    if (filters.minPrice) filters.minPrice = parseFloat(filters.minPrice);
     return filters;
   }
 

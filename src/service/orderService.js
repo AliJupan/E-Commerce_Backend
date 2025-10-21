@@ -1,6 +1,4 @@
-import BaseService from "./BaseService.js";
-
-class OrderService extends BaseService {
+class OrderService {
   constructor(
     orderRepository,
     logger,
@@ -11,7 +9,7 @@ class OrderService extends BaseService {
     userService,
     invoiceService
   ) {
-    super(logger);
+    this.logger = logger;
     this.orderRepository = orderRepository;
     this.fileUploadLib = fileUploadLib;
     this.orderDetailsService = orderDetailsService;
@@ -21,44 +19,80 @@ class OrderService extends BaseService {
     this.invoiceService = invoiceService;
   }
 
+  logInfo(fn, message, extra = {}) {
+    this.logger.info({
+      module: "OrderService",
+      fn,
+      message,
+      ...extra,
+    });
+  }
+
+  logError(fn, message, extra = {}) {
+    this.logger.error({
+      module: "OrderService",
+      fn,
+      message,
+      ...extra,
+    });
+  }
+
+  logWarn(fn, message, extra = {}) {
+    this.logger.warn({
+      module: "OrderService",
+      fn,
+      message,
+      ...extra,
+    });
+  }
+
+  parseId(id) {
+    const parsed = parseInt(id, 10);
+    if (isNaN(parsed)) throw new Error("Invalid ID format");
+    return parsed;
+  }
+
   async createOrder(data) {
-    return this.wrapAsync("createOrder", async () => {
+    const fn = "createOrder";
+    try {
       const { items, ...orderInfo } = data;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         throw new Error("Order must include at least one item.");
       }
 
-      // Fetch product prices and available quantities from database
+      this.logInfo(fn, "Fetching products for order");
       const products = await this.productService.getProductsByIds(
         items.map((i) => i.productId)
       );
 
-      const orderItems = items.map((item) => {
+      const orderItems = [];
+      for (const item of items) {
         const product = products.find((p) => p.id === item.productId);
-        if (!product)
+        if (!product) {
           throw new Error(`Product with ID ${item.productId} not found`);
+        }
 
-        // Check available quantity
         if (item.quantity > product.quantity) {
           throw new Error(
             `Not enough quantity for product "${product.name}". Available: ${product.quantity}, requested: ${item.quantity}`
           );
         }
 
-        return {
+        orderItems.push({
           ...item,
           price: product.price,
           totalPrice: product.price * item.quantity,
-        };
-      });
+        });
+      }
 
       const totalPrice = orderItems.reduce(
         (sum, item) => sum + item.totalPrice,
         0
       );
 
-      var order = await this.orderRepository.createOrder({
+      this.logInfo(fn, "Creating order record");
+      let order = await this.orderRepository.createOrder({
         ...orderInfo,
         totalPrice,
         isDelivered: false,
@@ -67,7 +101,7 @@ class OrderService extends BaseService {
 
       await this.orderDetailsService.addOrderDetails(order.id, orderItems);
 
-      // Update product quantities after order is created
+      this.logInfo(fn, "Updating product quantities");
       for (const item of orderItems) {
         await this.productService.updateProductQuantity(
           item.productId,
@@ -75,11 +109,14 @@ class OrderService extends BaseService {
         );
       }
 
+      this.logInfo(fn, "Generating invoice");
       await this.invoiceService.createInvoice(order.id);
 
       order = await this.orderRepository.getOrderById(order.id);
 
       const admins = await this.userService.getAdmins();
+      this.logInfo(fn, `Sending notifications to ${admins.length} admins`);
+
       for (const admin of admins) {
         await this.emailService.sendOrderNotificationAdmin(
           admin.email,
@@ -87,18 +124,25 @@ class OrderService extends BaseService {
         );
       }
 
-      this.emailService.sendOrderConfirmationCustomer(
+      this.logInfo(fn, "Sending confirmation email to customer");
+      await this.emailService.sendOrderConfirmationCustomer(
         order.email,
         order.name,
         order.id,
-        order.invoice.pdfUrl
+        order.invoice?.pdfUrl
       );
+
+      this.logInfo(fn, "Order created successfully", { orderId: order.id });
       return order;
-    });
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
   }
 
   async getOrderById(id) {
-    return this.wrapAsync("getOrderById", async () => {
+    const fn = "getOrderById";
+    try {
       const parsedId = this.parseId(id);
       const order = await this.orderRepository.getOrderById(parsedId);
 
@@ -106,40 +150,93 @@ class OrderService extends BaseService {
         throw new Error(`Order with id ${parsedId} not found`);
       }
 
-      // If there's an invoice, fetch its PDF details using FileUploadLib
       if (order.invoice?.pdfUrl) {
         const invoiceFile = await this.fileUploadLib.get(order.invoice.pdfUrl);
+        order.invoice.pdfUrl = invoiceFile
+          ? `/uploads/${invoiceFile.fileName}`
+          : null;
+      }
 
-        if (invoiceFile != null) {
-          // Set a URL path for frontend access
-          order.invoice.pdfUrl = `/uploads/${invoiceFile.fileName}`;
-        } else {
-          order.invoice.pdfUrl = null;
+      this.logInfo(fn, "Order fetched successfully", { orderId: parsedId });
+      return order;
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
+  }
+
+  async getOrdersByUserId(id) {
+    const fn = "getOrdersByUserId";
+    try {
+      const parsedId = this.parseId(id);
+      const orders = await this.orderRepository.getOrdersByUserId(parsedId);
+
+      if (!orders || orders.length === 0) {
+        this.logWarn(fn, `No orders found for user ${parsedId}`);
+        return [];
+      }
+
+      for (const order of orders) {
+        if (order.invoice?.pdfUrl) {
+          const invoiceFile = await this.fileUploadLib.get(order.invoice.pdfUrl);
+          order.invoice.pdfUrl = invoiceFile
+            ? `/uploads/${invoiceFile.fileName}`
+            : null;
         }
       }
 
-      return order;
-    });
+      this.logInfo(fn, "Orders fetched successfully", { userId: parsedId });
+      return orders;
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
   }
 
-  getAllOrders() {
-    return this.wrapAsync("getAllOrders", async () => {
-      return this.orderRepository.getAllOrders();
-    });
+  async getAllOrders() {
+    const fn = "getAllOrders";
+    try {
+      const orders = await this.orderRepository.getAllOrders();
+      if (!orders || orders.length === 0) {
+        this.logWarn(fn, "No orders found in database");
+      }
+      this.logInfo(fn, "Orders fetched successfully");
+      return orders;
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
   }
 
-  updateOrder(id, data) {
-    return this.wrapAsync("updateOrder", async () => {
+  async updateOrder(id, data) {
+    const fn = "updateOrder";
+    try {
       const parsedId = this.parseId(id);
-      return this.orderRepository.updateOrder(parsedId, data);
-    });
+      this.logInfo(fn, "Updating order", { orderId: parsedId });
+      const updatedOrder = await this.orderRepository.updateOrder(
+        parsedId,
+        data
+      );
+      this.logInfo(fn, "Order updated successfully", { orderId: parsedId });
+      return updatedOrder;
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
   }
 
-  deleteOrder(id) {
-    return this.wrapAsync("deleteOrder", async () => {
+  async deleteOrder(id) {
+    const fn = "deleteOrder";
+    try {
       const parsedId = this.parseId(id);
-      return this.orderRepository.deleteOrder(parsedId);
-    });
+      this.logInfo(fn, "Deleting order", { orderId: parsedId });
+      await this.orderRepository.deleteOrder(parsedId);
+      this.logInfo(fn, "Order deleted successfully", { orderId: parsedId });
+      return true;
+    } catch (error) {
+      this.logError(fn, error.message, { stack: error.stack });
+      throw error;
+    }
   }
 
   setInvoiceService(invoiceService) {

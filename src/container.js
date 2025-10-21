@@ -5,6 +5,10 @@ import UserRepository from "./repository/userRepository.js";
 import UserService from "./service/userService.js";
 import UserController from "./controller/userController.js";
 
+import AuthRepository from "./repository/authRepository.js";
+import AuthService from "./service/authService.js"; 
+import AuthController from "./controller/authController.js";
+
 import ProductRepository from "./repository/productRepository.js";
 import ProductService from "./service/productService.js";
 import ProductController from "./controller/productController.js";
@@ -53,6 +57,10 @@ const userRepository = new UserRepository(prisma);
 const userService = new UserService(userRepository, emailService, logger);
 const userController = new UserController(userService, logger);
 
+const authRepository = new AuthRepository(prisma);
+const authService = new AuthService(authRepository,emailService,logger);
+const authController = new AuthController(authService,logger);
+
 const productRepository = new ProductRepository(prisma);
 const productService = new ProductService(
   productRepository,
@@ -75,6 +83,7 @@ orderService.setInvoiceService(invoiceService);
 
 export {
   userController,
+  authController,
   productController,
   pictureController,
   orderController,

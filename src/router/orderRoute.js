@@ -8,17 +8,14 @@ const orderRoutes = (
   roleMiddleware,
   orderValidator
 ) => {
-  // Create a new order (only authenticated users can do this)
   router.post(
     "/",
     [
-      authenticationMiddleware.authenticate(),
+      // authenticationMiddleware.authenticate(),
       orderValidator.validateCreateOrder(),
     ],
     orderController.createOrder()
   );
-
-  // Get all orders (only admins or super admins)
   router.get(
     "/",
     [
@@ -27,8 +24,6 @@ const orderRoutes = (
     ],
     orderController.getAllOrders()
   );
-
-  // Get order by ID (admins or the owner can view)
   router.get(
     "/:id",
     [
@@ -37,8 +32,13 @@ const orderRoutes = (
     ],
     orderController.getOrderById()
   );
-
-  // Update order
+  router.get(
+    "/user/me",
+    [
+      authenticationMiddleware.authenticate(),
+    ],
+    orderController.getOrdersByUserId()
+  );
   router.put(
     "/update/:id",
     [
@@ -48,8 +48,6 @@ const orderRoutes = (
     ],
     orderController.updateOrder()
   );
-
-  // Delete order
   router.delete(
     "/:id",
     [

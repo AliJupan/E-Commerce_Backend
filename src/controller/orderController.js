@@ -1,60 +1,150 @@
-import BaseController from "./BaseController.js";
+import jwt from "jsonwebtoken";
 
-class OrderController extends BaseController {
+class OrderController {
   constructor(orderService, logger) {
-    super(logger, "OrderController");
     this.orderService = orderService;
+    this.logger = logger;
   }
 
   createOrder() {
-    return this.handleRequest("createOrder", async (req) => {
-      const data = req.body;
-      const order = await this.orderService.createOrder(data);
+    return [
+      async (req, res) => {
+        try {
+          const data = req.body;
+          const order = await this.orderService.createOrder(data);
 
-      this.logInfo("createOrder", "Order created successfully", {
-        name: data.name,
-        email: data.email,
-        totalPrice: data.totalPrice,
-      });
+          this.logger.info({
+            module: "OrderController",
+            fn: "createOrder",
+            message: "Order created successfully",
+            extra: {
+              name: data.name,
+              email: data.email,
+              totalPrice: data.totalPrice,
+            },
+          });
 
-      return { status: 201, data: order };
-    });
+          res.status(201).json(order);
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "createOrder",
+            message: `Error creating order: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
   }
 
   getOrderById() {
-    return this.handleRequest("getOrderById", async (req) => {
-      const { id } = req.params;
-      const order = await this.orderService.getOrderById(id);
-      return { status: 200, data: order };
-    });
+    return [
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const order = await this.orderService.getOrderById(id);
+          res.status(200).json(order);
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "getOrderById",
+            message: `Error fetching order: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
+  }
+
+  getOrdersByUserId() {
+    return [
+      async (req, res) => {
+        try {
+          const order = await this.orderService.getOrdersByUserId(req.user.id);
+          res.status(200).json(order);
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "getOrdersByUserId",
+            message: `Error fetching user orders: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
   }
 
   getAllOrders() {
-    return this.handleRequest("getAllOrders", async () => {
-      const orders = await this.orderService.getAllOrders();
-      return { status: 200, data: orders };
-    });
+    return [
+      async (req, res) => {
+        try {
+          const orders = await this.orderService.getAllOrders();
+          res.status(200).json(orders);
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "getAllOrders",
+            message: `Error fetching all orders: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
   }
 
   updateOrder() {
-    return this.handleRequest("updateOrder", async (req) => {
-      const { id } = req.params;
-      const data = req.body;
-      const updatedOrder = await this.orderService.updateOrder(id, data);
+    return [
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const data = req.body;
+          const updatedOrder = await this.orderService.updateOrder(id, data);
 
-      this.logInfo("updateOrder", "Order updated successfully", { id });
-      return { status: 200, data: updatedOrder };
-    });
+          this.logger.info({
+            module: "OrderController",
+            fn: "updateOrder",
+            message: "Order updated successfully",
+            extra: { id },
+          });
+
+          res.status(200).json(updatedOrder);
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "updateOrder",
+            message: `Error updating order: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
   }
 
   deleteOrder() {
-    return this.handleRequest("deleteOrder", async (req) => {
-      const { id } = req.params;
-      await this.orderService.deleteOrder(id);
+    return [
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          await this.orderService.deleteOrder(id);
 
-      this.logInfo("deleteOrder", "Order deleted successfully", { id });
-      return { status: 204, data: null };
-    });
+          this.logger.info({
+            module: "OrderController",
+            fn: "deleteOrder",
+            message: "Order deleted successfully",
+            extra: { id },
+          });
+
+          res.status(204).json();
+        } catch (error) {
+          this.logger.error({
+            module: "OrderController",
+            fn: "deleteOrder",
+            message: `Error deleting order: ${error.message}`,
+          });
+          res.status(500).json({ error: error.message });
+        }
+      },
+    ];
   }
 }
 

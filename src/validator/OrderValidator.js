@@ -11,6 +11,7 @@ export default class OrderValidator extends BaseValidator {
 
   validateCreateOrder() {
     const schema = Joi.object({
+      userId: Joi.number().integer().optional(),
       name: Joi.string().max(20).required(),
       surname: Joi.string().max(20).required(),
       email: Joi.string().email().max(40).required(),
@@ -18,6 +19,7 @@ export default class OrderValidator extends BaseValidator {
       city: Joi.string().max(20).required(),
       postalCode: Joi.string().max(20).required(),
       address: Joi.string().max(40).required(),
+      cardLast4:Joi.string().max(4).required(),
       // Order items
       items: Joi.array()
         .items(

@@ -8,83 +8,54 @@ const userRoutes = (
   roleMiddleware,
   userMiddleware,
   superAdminMiddleware,
-//   adminMiddleware,
   userValidator
 ) => {
-  router.post(
-    "/login",
-    [userValidator.validateUserLogin()],
-    userController.login()
-  );
-  router.post(
-    "/",
-    [
-      authenticationMiddleware.authenticate(),
-      roleMiddleware.isAdminOrSuperAdmin(),
-      userValidator.validateUserRegistration(),
-    ],
-    userController.registerUser()
-  );
-
+  // 🔹 Get all users (Admin or Super Admin)
   router.get(
     "/",
-    [
-      authenticationMiddleware.authenticate(),
-      roleMiddleware.isAdminOrSuperAdmin(),
-    ],
+    authenticationMiddleware.authenticate(),
+    roleMiddleware.isAdminOrSuperAdmin(),
     userController.getAllUsers()
   );
+
+  // 🔹 Get single user by ID (Authorized)
   router.get(
     "/:id",
-    [authenticationMiddleware.authenticate(), userMiddleware.authorize()],
+    authenticationMiddleware.authenticate(),
+    userMiddleware.authorize(),
     userController.getUserById()
   );
 
+  // 🔹 Update user (Authorized)
   router.put(
     "/update/:id",
-    [
-      authenticationMiddleware.authenticate(),
-      userMiddleware.authorize(),
-      userValidator.validateUpdateUser(),
-    ],
+    authenticationMiddleware.authenticate(),
+    userMiddleware.authorize(),
+    userValidator.validateUpdateUser(),
     userController.updateUser()
   );
-//   router.put(
-//     "/make-admin/:id",
-//     [authenticationMiddleware.authenticate(), adminMiddleware.authorize()],
-//     userController.promoteToAdmin()
-//   );
+
+  // 🔹 Promote user to Super Admin (Only Super Admins)
   router.put(
     "/make-super-admin/:id",
-    [authenticationMiddleware.authenticate(), superAdminMiddleware.authorize()],
+    authenticationMiddleware.authenticate(),
+    superAdminMiddleware.authorize(),
     userController.promoteToSuperAdmin()
   );
-  router.put(
-    "/change-password",
-    [
-      authenticationMiddleware.authenticate(),
-      userMiddleware.verifyEmailMatchFromToken(),
-    ],
-    userController.changePassword()
-  );
-  router.post("/forgot-password", userController.forgotPassword());
-  router.put(
-    "/reset-password",
-    [authenticationMiddleware.authenticate()],
-    userController.resetPassword()
-  );
+
+  // 🔹 Disable user (Admin or Super Admin)
   router.put(
     "/disable/:id",
-    [
-      authenticationMiddleware.authenticate(),
-      roleMiddleware.isAdminOrSuperAdmin(),
-    ],
+    authenticationMiddleware.authenticate(),
+    roleMiddleware.isAdminOrSuperAdmin(),
     userController.disableUser()
   );
 
+  // 🔹 Delete user (Only Super Admins)
   router.delete(
     "/:id",
-    [authenticationMiddleware.authenticate(), superAdminMiddleware.authorize()],
+    authenticationMiddleware.authenticate(),
+    superAdminMiddleware.authorize(),
     userController.deleteUser()
   );
 

@@ -78,13 +78,13 @@ class ProductController extends BaseController {
   getAllProducts() {
     return this.handleRequest("getAllProducts", async (req) => {
       const filters = req.query;
-      const products = await this.productService.listAllProducts(filters);
+      const result = await this.productService.listAllProducts(filters);
 
       this.logInfo("getAllProducts", "All products fetched", {
-        count: products.length,
+        count: result.pagination.total,
       });
 
-      return { data: products };
+      return result;
     });
   }
 

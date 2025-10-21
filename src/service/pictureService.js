@@ -1,5 +1,5 @@
 import path from "path";
-import BaseService from "./BaseService.js"; // Adjust path as needed
+import BaseService from "./BaseService.js";
 
 class PictureService extends BaseService {
   constructor(pictureRepository, logger, fileUploadLib) {

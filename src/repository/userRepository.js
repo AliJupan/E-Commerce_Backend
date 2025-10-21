@@ -3,54 +3,12 @@ class UserRepository {
     this.prisma = prismaClient;
   }
 
-  async createUser(data) {
-    const user = await this.prisma.user.create({ data });
-    return user;
-  }
-
-  async findUserByEmail(email) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    return user;
-  }
-
-  async findUserById(userId) {
-    const id = parseInt(userId, 10);
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        isEnabled: true,
-      },
-    });
-    return user;
-  }
-
-  async updateUserPassword(email, newPassword) {
-    const user = await this.prisma.user.update({
-      where: { email },
-      data: { password: newPassword },
-    });
-    return user;
-  }
-
-  async resetUserPassword(userId, newPassword) {
-    const id = parseInt(userId, 10);
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: { password: newPassword },
-    });
-    return user;
-  }
-
+  // Get all non-SUPER_ADMIN users with pagination
   async getAllUsers({ page = 1, limit = 10 } = {}) {
     page = parseInt(page, 10);
     limit = parseInt(limit, 10);
 
-    const users = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: { NOT: { role: "SUPER_ADMIN" } },
       select: {
         id: true,
@@ -63,59 +21,60 @@ class UserRepository {
       skip: (page - 1) * limit,
       take: limit,
     });
-    return users;
   }
 
+  // Update user info (excluding password)
   async updateUser(userId, data) {
     const id = parseInt(userId, 10);
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id },
       data,
     });
-    return updated;
   }
 
+  // Make user ADMIN
   async makeUserAdmin(userId) {
     const id = parseInt(userId, 10);
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { role: "ADMIN" },
     });
-    return updated;
   }
 
+  // Make user SUPER_ADMIN
   async makeUserSuperAdmin(userId) {
     const id = parseInt(userId, 10);
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { role: "SUPER_ADMIN" },
     });
-    return updated;
   }
 
+  // Toggle user enabled/disabled
   async toggleUserEnabled(userId) {
     const id = parseInt(userId, 10);
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { isEnabled: true },
     });
     if (!user) return null;
 
-    const updated = await this.prisma.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { isEnabled: !user.isEnabled },
     });
-    return updated;
   }
 
+  // Delete user
   async deleteUser(userId) {
     const id = parseInt(userId, 10);
-    const deleted = await this.prisma.user.delete({ where: { id } });
-    return deleted;
+    return this.prisma.user.delete({ where: { id } });
   }
 
+  // Get all admins
   async getAdmins() {
-    const admins = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: { role: "ADMIN" },
       select: {
         id: true,
@@ -126,8 +85,6 @@ class UserRepository {
         isEnabled: true,
       },
     });
-
-    return admins;
   }
 }
 

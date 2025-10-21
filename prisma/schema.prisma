@@ -20,17 +20,20 @@ model User {
     name       String    @db.VarChar(20)
     surname    String    @db.VarChar(20)
     email      String    @unique @db.VarChar(50)
-    password   String    
-    address    String    @db.VarChar(50)
-    birthday   DateTime
+    password   String
+    address    String?   @db.VarChar(50)
+    city       String?   @db.VarChar(50)
+    country    String?   @db.VarChar(50)
+    postCode   String?   @db.VarChar(50)
     createdAt  DateTime  @default(now())
-    isEnabled  Boolean
-    role       Role
+    isEnabled  Boolean   @default(true)
+    role       Role      @default(CUSTOMER)
     addedById  Int?
     addedBy    User?     @relation("UserAddedBy", fields: [addedById], references: [id])
     addedUsers User[]    @relation("UserAddedBy")
     products   Product[]
     pictures   Picture[]
+    orders     Order[]
 }
 
 model Product {
@@ -38,8 +41,9 @@ model Product {
     name         String         @db.VarChar(20)
     category     String         @db.VarChar(20)
     price        Float
-    description  String         
+    description  String
     quantity     Int
+    isFeatured   Boolean        @default(false)
     addedById    Int
     addedBy      User           @relation(fields: [addedById], references: [id])
     createdAt    DateTime       @default(now())
@@ -70,7 +74,10 @@ model Order {
     totalPrice   Float
     isDelivered  Boolean
     isPaid       Boolean
+    cardLast4    String?        @db.Char(4)
     createdAt    DateTime       @default(now())
+    userId       Int?
+    user         User?          @relation(fields: [userId], references: [id])
     orderDetails OrderDetails[]
     invoice      Invoice?
 }
@@ -88,10 +95,10 @@ model OrderDetails {
 }
 
 model Invoice {
-    id         Int      @id @default(autoincrement())
-    orderId    Int      @unique
-    createdAt  DateTime @default(now())
-    pdfUrl     String?
+    id        Int      @id @default(autoincrement())
+    orderId   Int      @unique
+    createdAt DateTime @default(now())
+    pdfUrl    String?
 
-    order    Order @relation(fields: [orderId], references: [id])
+    order Order @relation(fields: [orderId], references: [id])
 }
