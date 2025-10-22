@@ -1,13 +1,11 @@
-import BaseService from "./BaseService.js";
-
-export default class OrderDetailsService extends BaseService {
-  constructor(logger, orderDetailsRepository) {
-    super(logger);
+export default class OrderDetailsService {
+  constructor(orderDetailsRepository, logger) {
     this.orderDetailsRepository = orderDetailsRepository;
+    this.logger = logger;
   }
 
-  addOrderDetails(orderId, items) {
-    return this.wrapAsync("addOrderDetails", async () => {
+  async addOrderDetails(orderId, items) {
+    try {
       const detailsData = items.map((item) => ({
         orderId,
         productId: item.productId,
@@ -16,40 +14,95 @@ export default class OrderDetailsService extends BaseService {
         totalPrice: item.price * item.quantity,
       }));
 
-      return this.orderDetailsRepository.createManyOrderDetails(detailsData);
-    });
+      const created = await this.orderDetailsRepository.createManyOrderDetails(detailsData);
+
+      this.logger?.info({
+        module: "OrderDetailsService",
+        fn: "addOrderDetails",
+        message: "Order details added successfully",
+        orderId,
+        count: created.length,
+      });
+
+      return created;
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "addOrderDetails",
+        message: error.message,
+        orderId,
+      });
+      throw error;
+    }
   }
 
-  getOrderDetails(orderId) {
-    return this.wrapAsync("getOrderDetails", async () => {
-      return this.orderDetailsRepository.getOrderDetailsByOrderId(orderId);
-    });
+  async getOrderDetails(orderId) {
+    try {
+      return await this.orderDetailsRepository.getOrderDetailsByOrderId(orderId);
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "getOrderDetails",
+        message: error.message,
+        orderId,
+      });
+      throw error;
+    }
   }
 
-  getOrderDetailById(id) {
-    return this.wrapAsync("getOrderDetailById", async () => {
-      return this.orderDetailsRepository.getOrderDetailById(this.parseId(id));
-    });
+  async getOrderDetailById(id) {
+    try {
+      return await this.orderDetailsRepository.getOrderDetailById(parseInt(id));
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "getOrderDetailById",
+        message: error.message,
+        id,
+      });
+      throw error;
+    }
   }
 
-  updateOrderDetail(id, updateData) {
-    return this.wrapAsync("updateOrderDetail", async () => {
-      return this.orderDetailsRepository.updateOrderDetail(
-        this.parseId(id),
-        updateData
-      );
-    });
+  async updateOrderDetail(id, updateData) {
+    try {
+      return await this.orderDetailsRepository.updateOrderDetail(parseInt(id), updateData);
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "updateOrderDetail",
+        message: error.message,
+        id,
+      });
+      throw error;
+    }
   }
 
-  removeOrderDetail(id) {
-    return this.wrapAsync("removeOrderDetail", async () => {
-      return this.orderDetailsRepository.deleteOrderDetail(this.parseId(id));
-    });
+  async removeOrderDetail(id) {
+    try {
+      return await this.orderDetailsRepository.deleteOrderDetail(parseInt(id));
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "removeOrderDetail",
+        message: error.message,
+        id,
+      });
+      throw error;
+    }
   }
 
-  removeAllDetailsForOrder(orderId) {
-    return this.wrapAsync("removeAllDetailsForOrder", async () => {
-      return this.orderDetailsRepository.deleteOrderDetailsByOrderId(orderId);
-    });
+  async removeAllDetailsForOrder(orderId) {
+    try {
+      return await this.orderDetailsRepository.deleteOrderDetailsByOrderId(parseInt(orderId));
+    } catch (error) {
+      this.logger?.error({
+        module: "OrderDetailsService",
+        fn: "removeAllDetailsForOrder",
+        message: error.message,
+        orderId,
+      });
+      throw error;
+    }
   }
 }

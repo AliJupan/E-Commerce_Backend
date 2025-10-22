@@ -1,18 +1,22 @@
-import BaseController from "./BaseController.js";
-
-class PictureController extends BaseController {
+class PictureController {
   constructor(pictureService, logger) {
-    super(logger, "PictureController");
     this.pictureService = pictureService;
+    this.logger = logger;
   }
 
-  uploadAndSavePicture() {
-    return this.handleRequest("uploadAndSavePicture", async (req) => {
+  async uploadAndSavePicture(req, res) {
+    try {
       const { productId, isThumbnail } = req.body;
       const picture = req.files?.pictures;
 
       if (!picture) {
-        return { status: 400, data: { message: "No picture provided" } };
+        this.logger.error({
+          module: "PictureController",
+          fn: "uploadAndSavePicture",
+          message: "No picture provided",
+          productId,
+        });
+        return res.status(400).json({ message: "No picture provided" });
       }
 
       const uploadedPicture = await this.pictureService.uploadAndSavePicture(
@@ -21,72 +25,122 @@ class PictureController extends BaseController {
         isThumbnail
       );
 
-      this.logInfo("uploadAndSavePicture", "Uploaded and saved picture", {
+      this.logger.info({
+        module: "PictureController",
+        fn: "uploadAndSavePicture",
+        message: "Uploaded and saved picture",
         productId,
         isThumbnail,
       });
 
-      return { status: 201, data: uploadedPicture };
-    });
+      return res.status(201).json(uploadedPicture);
+    } catch (error) {
+      this.logger.error({
+        module: "PictureController",
+        fn: "uploadAndSavePicture",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  getPicturesByProductId() {
-    return this.handleRequest("getPicturesByProductId", async (req) => {
+  async getPicturesByProductId(req, res) {
+    try {
       const { productId } = req.params;
       const pictures = await this.pictureService.getPicturesByProductId(
         parseInt(productId)
       );
 
-      this.logInfo("getPicturesByProductId", "Fetched pictures for product", {
+      this.logger.info({
+        module: "PictureController",
+        fn: "getPicturesByProductId",
+        message: "Fetched pictures for product",
         productId,
       });
 
-      return { data: pictures };
-    });
+      return res.status(200).json(pictures);
+    } catch (error) {
+      this.logger.error({
+        module: "PictureController",
+        fn: "getPicturesByProductId",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  toggleIsThumbnail() {
-    return this.handleRequest("toggleIsThumbnail", async (req) => {
+  async toggleIsThumbnail(req, res) {
+    try {
       const { id } = req.params;
       const updated = await this.pictureService.updateIsThumbnail(parseInt(id));
 
-      this.logInfo("toggleIsThumbnail", "Toggled isThumbnail", {
+      this.logger.info({
+        module: "PictureController",
+        fn: "toggleIsThumbnail",
+        message: "Toggled isThumbnail",
         id,
         isThumbnail: updated.isThumbnail,
       });
 
-      return { data: updated };
-    });
+      return res.status(200).json(updated);
+    } catch (error) {
+      this.logger.error({
+        module: "PictureController",
+        fn: "toggleIsThumbnail",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  deletePicture() {
-    return this.handleRequest("deletePicture", async (req) => {
+  async deletePicture(req, res) {
+    try {
       const { id } = req.params;
       await this.pictureService.deletePicture(parseInt(id));
 
-      this.logInfo("deletePicture", "Deleted picture", { id });
+      this.logger.info({
+        module: "PictureController",
+        fn: "deletePicture",
+        message: "Deleted picture",
+        id,
+      });
 
-      return { data: { message: `Picture ${id} deleted successfully` } };
-    });
+      return res
+        .status(200)
+        .json({ message: `Picture ${id} deleted successfully` });
+    } catch (error) {
+      this.logger.error({
+        module: "PictureController",
+        fn: "deletePicture",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  deletePicturesByProductId() {
-    return this.handleRequest("deletePicturesByProductId", async (req) => {
+  async deletePicturesByProductId(req, res) {
+    try {
       const { productId } = req.params;
       await this.pictureService.deletePicturesByProductId(parseInt(productId));
 
-      this.logInfo(
-        "deletePicturesByProductId",
-        "Deleted all pictures for product",
-        { productId }
-      );
+      this.logger.info({
+        module: "PictureController",
+        fn: "deletePicturesByProductId",
+        message: "Deleted all pictures for product",
+        productId,
+      });
 
-      return {
-        data: {
-          message: `All pictures for product ${productId} deleted successfully`,
-        },
-      };
-    });
+      return res.status(200).json({
+        message: `All pictures for product ${productId} deleted successfully`,
+      });
+    } catch (error) {
+      this.logger.error({
+        module: "PictureController",
+        fn: "deletePicturesByProductId",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 }
 

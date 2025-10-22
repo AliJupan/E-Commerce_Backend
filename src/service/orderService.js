@@ -1,15 +1,14 @@
 class OrderService {
   constructor(
     orderRepository,
-    logger,
     fileUploadLib,
     orderDetailsService,
     productService,
     emailService,
     userService,
-    invoiceService
+    invoiceService,
+    logger
   ) {
-    this.logger = logger;
     this.orderRepository = orderRepository;
     this.fileUploadLib = fileUploadLib;
     this.orderDetailsService = orderDetailsService;
@@ -17,81 +16,50 @@ class OrderService {
     this.emailService = emailService;
     this.userService = userService;
     this.invoiceService = invoiceService;
-  }
-
-  logInfo(fn, message, extra = {}) {
-    this.logger.info({
-      module: "OrderService",
-      fn,
-      message,
-      ...extra,
-    });
-  }
-
-  logError(fn, message, extra = {}) {
-    this.logger.error({
-      module: "OrderService",
-      fn,
-      message,
-      ...extra,
-    });
-  }
-
-  logWarn(fn, message, extra = {}) {
-    this.logger.warn({
-      module: "OrderService",
-      fn,
-      message,
-      ...extra,
-    });
-  }
-
-  parseId(id) {
-    const parsed = parseInt(id, 10);
-    if (isNaN(parsed)) throw new Error("Invalid ID format");
-    return parsed;
+    this.logger = logger;
   }
 
   async createOrder(data) {
-    const fn = "createOrder";
     try {
       const { items, ...orderInfo } = data;
-
-      if (!items || !Array.isArray(items) || items.length === 0) {
+      if (!items?.length)
         throw new Error("Order must include at least one item.");
-      }
 
-      this.logInfo(fn, "Fetching products for order");
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Fetching products",
+      });
       const products = await this.productService.getProductsByIds(
         items.map((i) => i.productId)
       );
 
-      const orderItems = [];
-      for (const item of items) {
+      const orderItems = items.map((item) => {
         const product = products.find((p) => p.id === item.productId);
-        if (!product) {
+        if (!product)
           throw new Error(`Product with ID ${item.productId} not found`);
-        }
-
-        if (item.quantity > product.quantity) {
+        if (item.quantity > product.quantity)
           throw new Error(
             `Not enough quantity for product "${product.name}". Available: ${product.quantity}, requested: ${item.quantity}`
           );
-        }
 
-        orderItems.push({
+        return {
           ...item,
           price: product.price,
           totalPrice: product.price * item.quantity,
-        });
-      }
+        };
+      });
 
       const totalPrice = orderItems.reduce(
         (sum, item) => sum + item.totalPrice,
         0
       );
 
-      this.logInfo(fn, "Creating order record");
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Creating order record",
+      });
       let order = await this.orderRepository.createOrder({
         ...orderInfo,
         totalPrice,
@@ -101,30 +69,46 @@ class OrderService {
 
       await this.orderDetailsService.addOrderDetails(order.id, orderItems);
 
-      this.logInfo(fn, "Updating product quantities");
-      for (const item of orderItems) {
-        await this.productService.updateProductQuantity(
-          item.productId,
-          item.quantity
-        );
-      }
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Updating product quantities",
+      });
+      await Promise.all(
+        orderItems.map((item) =>
+          this.productService.updateProductQuantity(
+            item.productId,
+            item.quantity
+          )
+        )
+      );
 
-      this.logInfo(fn, "Generating invoice");
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Generating invoice",
+      });
       await this.invoiceService.createInvoice(order.id);
 
-      order = await this.orderRepository.getOrderById(order.id);
-
+      order = await this.orderRepository.getOrderById(parseInt(order.id));
       const admins = await this.userService.getAdmins();
-      this.logInfo(fn, `Sending notifications to ${admins.length} admins`);
 
-      for (const admin of admins) {
-        await this.emailService.sendOrderNotificationAdmin(
-          admin.email,
-          order.id
-        );
-      }
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: `Sending notifications to ${admins.length} admins`,
+      });
+      await Promise.all(
+        admins.map((admin) =>
+          this.emailService.sendOrderNotificationAdmin(admin.email, order.id)
+        )
+      );
 
-      this.logInfo(fn, "Sending confirmation email to customer");
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Sending confirmation email to customer",
+      });
       await this.emailService.sendOrderConfirmationCustomer(
         order.email,
         order.name,
@@ -132,23 +116,28 @@ class OrderService {
         order.invoice?.pdfUrl
       );
 
-      this.logInfo(fn, "Order created successfully", { orderId: order.id });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "createOrder",
+        message: "Order created successfully",
+        orderId: order.id,
+      });
       return order;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "createOrder",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async getOrderById(id) {
-    const fn = "getOrderById";
     try {
-      const parsedId = this.parseId(id);
-      const order = await this.orderRepository.getOrderById(parsedId);
-
-      if (!order) {
-        throw new Error(`Order with id ${parsedId} not found`);
-      }
+      const order = await this.orderRepository.getOrderById(parseInt(id));
+      if (!order) throw new Error(`Order with id ${id} not found`);
 
       if (order.invoice?.pdfUrl) {
         const invoiceFile = await this.fileUploadLib.get(order.invoice.pdfUrl);
@@ -157,90 +146,148 @@ class OrderService {
           : null;
       }
 
-      this.logInfo(fn, "Order fetched successfully", { orderId: parsedId });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "getOrderById",
+        message: "Order fetched successfully",
+        orderId: id,
+      });
       return order;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "getOrderById",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async getOrdersByUserId(id) {
-    const fn = "getOrdersByUserId";
     try {
-      const parsedId = this.parseId(id);
-      const orders = await this.orderRepository.getOrdersByUserId(parsedId);
-
-      if (!orders || orders.length === 0) {
-        this.logWarn(fn, `No orders found for user ${parsedId}`);
+      const orders = await this.orderRepository.getOrdersByUserId(parseInt(id));
+      if (!orders?.length) {
+        this.logger?.warn({
+          module: "OrderService",
+          fn: "getOrdersByUserId",
+          message: `No orders found for user ${id}`,
+        });
         return [];
       }
 
-      for (const order of orders) {
-        if (order.invoice?.pdfUrl) {
-          const invoiceFile = await this.fileUploadLib.get(order.invoice.pdfUrl);
-          order.invoice.pdfUrl = invoiceFile
-            ? `/uploads/${invoiceFile.fileName}`
-            : null;
-        }
-      }
+      await Promise.all(
+        orders.map(async (order) => {
+          if (order.invoice?.pdfUrl) {
+            const invoiceFile = await this.fileUploadLib.get(
+              order.invoice.pdfUrl
+            );
+            order.invoice.pdfUrl = invoiceFile
+              ? `/uploads/${invoiceFile.fileName}`
+              : null;
+          }
+        })
+      );
 
-      this.logInfo(fn, "Orders fetched successfully", { userId: parsedId });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "getOrdersByUserId",
+        message: "Orders fetched successfully",
+        userId: id,
+      });
       return orders;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "getOrdersByUserId",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async getAllOrders() {
-    const fn = "getAllOrders";
     try {
       const orders = await this.orderRepository.getAllOrders();
-      if (!orders || orders.length === 0) {
-        this.logWarn(fn, "No orders found in database");
-      }
-      this.logInfo(fn, "Orders fetched successfully");
+      if (!orders?.length)
+        this.logger?.warn({
+          module: "OrderService",
+          fn: "getAllOrders",
+          message: "No orders found in database",
+        });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "getAllOrders",
+        message: "Orders fetched successfully",
+      });
       return orders;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "getAllOrders",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async updateOrder(id, data) {
-    const fn = "updateOrder";
     try {
-      const parsedId = this.parseId(id);
-      this.logInfo(fn, "Updating order", { orderId: parsedId });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "updateOrder",
+        message: "Updating order",
+        orderId: id,
+      });
       const updatedOrder = await this.orderRepository.updateOrder(
-        parsedId,
+        parseInt(id),
         data
       );
-      this.logInfo(fn, "Order updated successfully", { orderId: parsedId });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "updateOrder",
+        message: "Order updated successfully",
+        orderId: id,
+      });
       return updatedOrder;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "updateOrder",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
 
   async deleteOrder(id) {
-    const fn = "deleteOrder";
     try {
-      const parsedId = this.parseId(id);
-      this.logInfo(fn, "Deleting order", { orderId: parsedId });
-      await this.orderRepository.deleteOrder(parsedId);
-      this.logInfo(fn, "Order deleted successfully", { orderId: parsedId });
+      this.logger?.info({
+        module: "OrderService",
+        fn: "deleteOrder",
+        message: "Deleting order",
+        orderId: parsedId,
+      });
+      await this.orderRepository.deleteOrder(parseInt(id));
+      this.logger?.info({
+        module: "OrderService",
+        fn: "deleteOrder",
+        message: "Order deleted successfully",
+        orderId: id,
+      });
       return true;
     } catch (error) {
-      this.logError(fn, error.message, { stack: error.stack });
+      this.logger?.error({
+        module: "OrderService",
+        fn: "deleteOrder",
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
-  }
-
-  setInvoiceService(invoiceService) {
-    this.invoiceService = invoiceService;
   }
 }
 

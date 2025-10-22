@@ -1,57 +1,63 @@
-import BaseService from "./BaseService.js";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 
-class InvoiceService extends BaseService {
+class InvoiceService {
   constructor(invoiceRepository, orderService, fileUploadLib, logger) {
-    super(logger);
     this.invoiceRepository = invoiceRepository;
     this.orderService = orderService;
-    this.fileUploadLib = fileUploadLib; // your upload library
+    this.fileUploadLib = fileUploadLib;
+    this.logger = logger;
   }
 
+  // Create a new invoice for an order
   async createInvoice(orderId) {
-    return this.wrapAsync("createInvoice", async () => {
+    try {
       // Check if invoice already exists
-      const existing = await this.invoiceRepository.getInvoiceByOrderId(
-        orderId
-      );
-      if (existing)
-        throw new Error(`Invoice for order ${orderId} already exists`);
+      const existing = await this.invoiceRepository.getInvoiceByOrderId(orderId);
+      if (existing) throw new Error(`Invoice for order ${orderId} already exists`);
 
       // Fetch order and details
       const order = await this.orderService.getOrderById(orderId);
       if (!order) throw new Error(`Order ${orderId} not found`);
 
-      // Generate PDF as buffer
+      // Generate PDF buffer
       const pdfBuffer = await this.generateInvoicePDFBuffer(order);
 
-      // Create a pseudo attachment object to use your FileUploadLib
+      // Create pseudo file for upload
       const attachment = {
         name: `invoice_order_${order.id}.pdf`,
-        mv: (filePath, cb) => {
-          fs.writeFile(filePath, pdfBuffer, cb);
-        },
+        mv: (filePath, cb) => fs.writeFile(filePath, pdfBuffer, cb),
       };
 
       const uploaded = await this.fileUploadLib.upload(attachment);
 
       // Save invoice in DB
       const invoice = await this.invoiceRepository.createInvoice({
-        orderId,
-        pdfUrl: `${uploaded.fileName}`, // path for frontend
+        orderId: parseInt(orderId),
+        pdfUrl: uploaded.fileName, // URL/path for frontend
       });
 
-      this.logInfo("createInvoice", "Invoice created successfully", {
+      this.logger.info({
+        module: "InvoiceService",
+        fn: "createInvoice",
+        message: "Invoice created successfully",
         orderId,
         pdfUrl: uploaded.fileName,
       });
 
       return invoice;
-    });
+    } catch (error) {
+      this.logger.error({
+        module: "InvoiceService",
+        fn: "createInvoice",
+        message: error.message,
+        orderId,
+      });
+      throw error;
+    }
   }
 
-  generateInvoicePDFBuffer(order) {
+  async generateInvoicePDFBuffer(order) {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument();
       const buffers = [];
@@ -61,9 +67,7 @@ class InvoiceService extends BaseService {
       doc.on("error", (err) => reject(err));
 
       // Header
-      doc
-        .fontSize(18)
-        .text(`Invoice for Order #${order.id}`, { align: "center" });
+      doc.fontSize(18).text(`Invoice for Order #${order.id}`, { align: "center" });
       doc.moveDown();
       doc.fontSize(12).text(`Name: ${order.name} ${order.surname}`);
       doc.text(`Email: ${order.email}`);
@@ -75,9 +79,7 @@ class InvoiceService extends BaseService {
       doc.text("Items:", { underline: true });
       order.orderDetails.forEach((item) => {
         doc.text(
-          `${item.product.name} - ${item.quantity} x $${item.price.toFixed(
-            2
-          )} = $${item.totalPrice.toFixed(2)}`
+          `${item.product.name} - ${item.quantity} x $${item.price.toFixed(2)} = $${item.totalPrice.toFixed(2)}`
         );
       });
 
@@ -88,11 +90,19 @@ class InvoiceService extends BaseService {
   }
 
   async getInvoice(orderId) {
-    return this.wrapAsync("getInvoice", async () => {
-      const invoice = await this.invoiceRepository.getInvoiceByOrderId(orderId);
+    try {
+      const invoice = await this.invoiceRepository.getInvoiceByOrderId(parseInt(orderId));
       if (!invoice) throw new Error(`Invoice for order ${orderId} not found`);
       return invoice;
-    });
+    } catch (error) {
+      this.logger.error({
+        module: "InvoiceService",
+        fn: "getInvoice",
+        message: error.message,
+        orderId,
+      });
+      throw error;
+    }
   }
 }
 

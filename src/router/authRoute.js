@@ -24,7 +24,7 @@ const authRoutes = (
 
   // 🔹 Get profile of authenticated user
   router.get(
-    "/profile/:id",
+    "/profile/me",
     authenticationMiddleware.authenticate(),
     userMiddleware.authorize(),
     authController.getUserById()

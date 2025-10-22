@@ -1,33 +1,57 @@
-import BaseController from "./BaseController.js";
 import jwt from "jsonwebtoken";
 
-class AuthController extends BaseController {
+class AuthController {
   constructor(authService, logger) {
-    super(logger, "AuthController");
     this.authService = authService;
+    this.logger = logger;
   }
 
-  register() {
-    return this.handleRequest("register", async (req) => {
+  async register(req, res) {
+    try {
       const data = req.body;
       const user = await this.authService.register(data);
+
       if (!user) {
-        this.logWarn("register", "Registration failed: Email already exists", {
+        this.logger.warn({
+          module: "AuthController",
+          fn: "register",
+          message: "Registration failed: Email already exists",
           email: data.email,
         });
-        return { status: 400, data: { error: "Email already exists" } };
+        return res.status(400).json({ error: "Email already exists" });
       }
-      this.logInfo("register", "User registered successfully", {
+
+      this.logger.info({
+        module: "AuthController",
+        fn: "register",
+        message: "User registered successfully",
         email: data.email,
       });
-      return { status: 201, data: user };
-    });
+      return res.status(201).json(user);
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "register",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  login() {
-    return this.handleRequest("login", async (req) => {
+  async login(req, res) {
+    try {
       const { email, password } = req.body;
       const user = await this.authService.login(email, password, req);
+
+      if (!user) {
+        this.logger.warn({
+          module: "AuthController",
+          fn: "login",
+          message: "Login failed: Invalid credentials",
+          email,
+        });
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
 
       const token = jwt.sign(
         { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -35,68 +59,166 @@ class AuthController extends BaseController {
         { expiresIn: "24h" }
       );
 
-      this.logInfo("login", "User logged in successfully", { email });
-      return {
-        data: {
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          },
-          token,
-        },
-      };
-    });
+      this.logger.info({
+        module: "AuthController",
+        fn: "login",
+        message: "User logged in successfully",
+        email,
+      });
+
+      return res.status(200).json({ user, token });
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "login",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  forgotPassword() {
-    return this.handleRequest("forgotPassword", async (req) => {
+  async forgotPassword(req, res) {
+    try {
       const { email } = req.body;
       const user = await this.authService.forgotPassword(email);
+
       if (!user) {
-        this.logError("forgotPassword", "Failed to generate reset token", {
+        this.logger.error({
+          module: "AuthController",
+          fn: "forgotPassword",
+          message: "No user found for email",
           email,
         });
-        return {
-          status: 400,
-          data: { error: "Error generating password reset token" },
-        };
+        return res
+          .status(404)
+          .json({ error: "No account found with that email" });
       }
-      this.logInfo("forgotPassword", "Password reset token sent", { email });
-      return { data: { message: "Password reset token sent" } };
-    });
+
+      this.logger.info({
+        module: "AuthController",
+        fn: "forgotPassword",
+        message: "Password reset token sent",
+        email,
+      });
+
+      return res
+        .status(200)
+        .json({ message: "Password reset token sent successfully" });
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "forgotPassword",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  resetPassword() {
-    return this.handleRequest("resetPassword", async (req) => {
+  async resetPassword(req, res) {
+    try {
       const { token, newPassword } = req.body;
       const result = await this.authService.resetPassword(token, newPassword);
-      this.logInfo("resetPassword", "Password reset successfully");
-      return { data: result };
-    });
+
+      if (!result) {
+        this.logger.error({
+          module: "AuthController",
+          fn: "resetPassword",
+          message: "Invalid or expired token",
+          token,
+        });
+        return res.status(400).json({ error: "Invalid or expired token" });
+      }
+
+      this.logger.info({
+        module: "AuthController",
+        fn: "resetPassword",
+        message: "Password reset successfully",
+        token,
+      });
+
+      return res
+        .status(200)
+        .json({ message: "Password has been reset successfully" });
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "resetPassword",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  changePassword() {
-    return this.handleRequest("changePassword", async (req) => {
+  async changePassword(req, res) {
+    try {
       const { email, oldPassword, newPassword } = req.body;
       const result = await this.authService.changePassword(
         email,
         oldPassword,
         newPassword
       );
-      this.logInfo("changePassword", "Password changed", { email });
-      return { data: result };
-    });
+
+      if (!result) {
+        this.logger.error({
+          module: "AuthController",
+          fn: "changePassword",
+          message: "Invalid credentials or update failed",
+          email,
+        });
+        return res
+          .status(400)
+          .json({ error: "Old password is incorrect or update failed" });
+      }
+
+      this.logger.info({
+        module: "AuthController",
+        fn: "changePassword",
+        message: "Password changed successfully",
+        email,
+      });
+
+      return res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "changePassword",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 
-  getUserById() {
-    return this.handleRequest("getUserById", async (req) => {
-      const { id } = req.params;
-      const user = await this.authService.getUserById(id); // optional: you can rename for clarity
-      this.logInfo("getUserById", "User fetched", { id });
-      return { data: user };
-    });
+  async getUserById(req, res) {
+    try {
+      const id = req.user.id;
+      const user = await this.authService.getUserById(id);
+
+      if (!user) {
+        this.logger.error({
+          module: "AuthController",
+          fn: "getUserById",
+          message: "User not found",
+          id,
+        });
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      this.logger.info({
+        module: "AuthController",
+        fn: "getUserById",
+        message: "User fetched successfully",
+        id,
+      });
+
+      return res.status(200).json(user);
+    } catch (error) {
+      this.logger.error({
+        module: "AuthController",
+        fn: "getUserById",
+        message: error.message,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 }
 

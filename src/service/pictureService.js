@@ -1,15 +1,14 @@
 import path from "path";
-import BaseService from "./BaseService.js";
 
-class PictureService extends BaseService {
-  constructor(pictureRepository, logger, fileUploadLib) {
-    super(logger);
+class PictureService {
+  constructor( pictureRepository, fileUploadLib, logger ) {
     this.pictureRepository = pictureRepository;
     this.fileUploadLib = fileUploadLib;
+    this.logger = logger;
   }
 
-  uploadAndSavePicture(picture, productId, isThumbnail, addedById) {
-    return this.wrapAsync("uploadAndSavePicture", async () => {
+  async uploadAndSavePicture(picture, productId, isThumbnail, addedById) {
+    try {
       const uploaded = await this.fileUploadLib.upload(picture);
       const originalExtension = path.extname(picture.name);
       const pictureName = uploaded.fileID + originalExtension;
@@ -17,133 +16,194 @@ class PictureService extends BaseService {
       const result = await this.pictureRepository.createPicture({
         url: pictureName,
         isThumbnail,
-        productId,
-        addedById,
+        productId: parseInt(addedById),
+        addedById: parseInt(addedById),
       });
 
-      this.logInfo("uploadAndSavePicture", "Uploaded and saved picture", {
+      this.logger?.info({
+        module: "PictureService",
+        fn: "uploadAndSavePicture",
+        message: "Uploaded and saved picture",
         productId,
         isThumbnail,
         url: pictureName,
       });
 
       return result;
-    });
-  }
-
-  getPicturesByProductId(productId) {
-    return this.wrapAsync("getPicturesByProductId", async () => {
-      const result = await this.pictureRepository.getPicturesByProductId(
-        productId
-      );
-
-      this.logInfo("getPicturesByProductId", "Fetched pictures by product ID", {
-        productId,
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "uploadAndSavePicture",
+        message: error.message,
+        stack: error.stack,
       });
-
-      return result;
-    });
+      throw error;
+    }
   }
 
-  getThumbnailByProductId(productId) {
-    return this.wrapAsync("getThumbnailByProductId", async () => {
-      const result = await this.pictureRepository.getThumbnailByProductId(
-        productId
+  async getPicturesByProductId(productId) {
+    try {
+      const result = await this.pictureRepository.getPicturesByProductId(
+        parseInt(productId)
       );
-
-      this.logInfo(
-        "getThumbnailByProductId",
-        "Fetched thumbnail by product ID",
-        {
-          productId,
-        }
-      );
-
+      this.logger?.info({
+        module: "PictureService",
+        fn: "getPicturesByProductId",
+        message: "Fetched pictures by product ID",
+        productId,
+        count: result.length,
+      });
       return result;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "getPicturesByProductId",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  async getThumbnailByProductId(productId) {
+    try {
+      const result = await this.pictureRepository.getThumbnailByProductId(
+        parseInt(productId)
+      );
+      this.logger?.info({
+        module: "PictureService",
+        fn: "getThumbnailByProductId",
+        message: "Fetched thumbnail by product ID",
+        productId,
+        thumbnailId: result?.id,
+      });
+      return result;
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "getThumbnailByProductId",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   async toggleIsThumbnail(pictureId) {
-    const currentPic = await this.pictureRepository.getPictureById(pictureId);
-    if (!currentPic) throw new Error(`Picture with id ${pictureId} not found`);
-
-    // If current picture is NOT a thumbnail, find any other thumbnails and unset them
-    if (!currentPic.isThumbnail) {
-      const otherPictures = await this.pictureRepository.getPicturesByProductId(
-        currentPic.productId
+    try {
+      const currentPic = await this.pictureRepository.getPictureById(
+        parseInt(pictureId)
       );
-      for (const pic of otherPictures) {
-        if (pic.isThumbnail && pic.id !== pictureId) {
-          // Unset other thumbnails by toggling them off only if they are ON
-          await this.pictureRepository.toggleIsThumbnail(pic.id);
-        }
+      if (!currentPic)
+        throw new Error(`Picture with id ${pictureId} not found`);
+
+      if (!currentPic.isThumbnail) {
+        const otherPictures =
+          await this.pictureRepository.getPicturesByProductId(
+            parseInt(currentPic.productId)
+          );
+        await Promise.all(
+          otherPictures
+            .filter((pic) => pic.isThumbnail && pic.id !== pictureId)
+            .map((pic) =>
+              this.pictureRepository.toggleIsThumbnail(parseInt(pic.id))
+            )
+        );
       }
+
+      const result = await this.pictureRepository.toggleIsThumbnail(
+        parseInt(pictureId)
+      );
+      this.logger?.info({
+        module: "PictureService",
+        fn: "toggleIsThumbnail",
+        message: "Toggled isThumbnail",
+        pictureId,
+        isThumbnail: result.isThumbnail,
+      });
+      return result;
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "toggleIsThumbnail",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    // Toggle the thumbnail flag for current picture
-    const result = await this.pictureRepository.toggleIsThumbnail(pictureId);
-
-    this.logger.info("toggleIsThumbnail", "Toggled isThumbnail", {
-      id: pictureId,
-      isThumbnail: result.isThumbnail,
-    });
-
-    return result;
   }
 
-  deletePicture(id) {
-    return this.wrapAsync("deletePicture", async () => {
-      const picture = await this.pictureRepository.getPictureById(id);
+  async deletePicture(id) {
+    try {
+      const picture = await this.pictureRepository.getPictureById(parseInt(id));
+      if (!picture) throw new Error(`Picture with id ${id} not found`);
 
       await this.fileUploadLib.delete(picture.url);
-      await this.pictureRepository.deletePicture(id);
+      await this.pictureRepository.deletePicture(parseInt(id));
 
       if (picture.isThumbnail) {
         const otherPictures = await this.getPicturesByProductId(
           picture.productId
         );
         if (otherPictures.length > 0) {
-          const newThumbnail = otherPictures[0];
-          await this.updateIsThumbnail(newThumbnail.id);
-
-          this.logInfo(
-            "deletePicture",
-            "Assigned new thumbnail after deletion",
-            {
-              productId: picture.productId,
-              newThumbnailId: newThumbnail.id,
-            }
-          );
+          await this.toggleIsThumbnail(otherPictures[0].id);
+          this.logger?.info({
+            module: "PictureService",
+            fn: "deletePicture",
+            message: "Assigned new thumbnail after deletion",
+            productId: picture.productId,
+            newThumbnailId: otherPictures[0].id,
+          });
         }
       }
 
-      this.logInfo("deletePicture", "Deleted picture", { id });
+      this.logger?.info({
+        module: "PictureService",
+        fn: "deletePicture",
+        message: "Deleted picture",
+        pictureId: id,
+      });
       return { success: true };
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "deletePicture",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  deletePicturesByProductId(productId) {
-    return this.wrapAsync("deletePicturesByProductId", async () => {
-      const pictures = await this.getPicturesByProductId(productId);
-      for (const pic of pictures) {
-        await this.fileUploadLib.delete(pic.url);
-      }
+  async deletePicturesByProductId(productId) {
+    try {
+      const pictures = await this.getPicturesByProductId(parseInt(productId));
+      await Promise.all(
+        pictures.map((pic) => this.fileUploadLib.delete(pic.url))
+      );
 
       const result = await this.pictureRepository.deletePicturesByProductId(
-        productId
+        parseInt(productId)
       );
 
-      this.logInfo(
-        "deletePicturesByProductId",
-        "Deleted all pictures for product",
-        {
-          productId,
-          count: pictures.length,
-        }
-      );
+      this.logger?.info({
+        module: "PictureService",
+        fn: "deletePicturesByProductId",
+        message: "Deleted all pictures for product",
+        productId,
+        count: pictures.length,
+      });
 
       return result;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "PictureService",
+        fn: "deletePicturesByProductId",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 }
 

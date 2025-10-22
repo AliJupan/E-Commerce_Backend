@@ -1,83 +1,183 @@
-import BaseService from "./BaseService.js";
-
-class UserService extends BaseService {
-  constructor(userRepository, logger) {
-    super(logger);
+class UserService {
+  constructor( userRepository, logger ) {
     this.userRepository = userRepository;
+    this.logger = logger;
   }
 
-  listAllUsers(filters) {
-    return this.wrapAsync("listAllUsers", async () => {
+  async listAllUsers(filters = {}) {
+    try {
       if (filters.take) filters.take = parseInt(filters.take);
       if (filters.limit) filters.limit = parseInt(filters.limit);
 
       const users = await this.userRepository.getAllUsers(filters);
-      this.logInfo("listAllUsers", "Fetched all users", { count: users.length });
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "listAllUsers",
+        message: "Fetched all users",
+        count: users.length,
+      });
+
       return users;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "listAllUsers",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  getUserById(userId) {
-    return this.wrapAsync("getUserById", async () => {
-      const user = await this.userRepository.findUserById(userId);
-      this.logInfo("getUserById", "User fetched by ID", { userId });
+  async getUserById(userId) {
+    try {
+      const user = await this.userRepository.findUserById(parseInt(userId));
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "getUserById",
+        message: "User fetched by ID",
+        userId: userId,
+      });
+
       return user;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "getUserById",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  updateUser(userId, data) {
-    return this.wrapAsync("updateUser", async () => {
-      const updated = await this.userRepository.updateUser(userId, data);
-      this.logInfo("updateUser", "User updated successfully", { userId });
+  async promoteToAdmin(userId) {
+    try {
+      const updated = await this.userRepository.makeUserAdmin(parseInt(userId));
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "promoteToAdmin",
+        message: "User promoted to ADMIN",
+        userId: userId,
+      });
+
       return updated;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "promoteToAdmin",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  promoteToAdmin(userId) {
-    return this.wrapAsync("promoteToAdmin", async () => {
-      const updated = await this.userRepository.makeUserAdmin(userId);
-      this.logInfo("promoteToAdmin", "User promoted to ADMIN", { userId });
+  async promoteToSuperAdmin(userId) {
+    try {
+      const updated = await this.userRepository.makeUserSuperAdmin(parseInt(userId));
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "promoteToSuperAdmin",
+        message: "User promoted to SUPER_ADMIN",
+        userId: userId,
+      });
+
       return updated;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "promoteToSuperAdmin",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  promoteToSuperAdmin(userId) {
-    return this.wrapAsync("promoteToSuperAdmin", async () => {
-      const updated = await this.userRepository.makeUserSuperAdmin(userId);
-      this.logInfo("promoteToSuperAdmin", "User promoted to SUPER_ADMIN", { userId });
-      return updated;
-    });
-  }
-
-  disableUser(userId) {
-    return this.wrapAsync("disableUser", async () => {
+  async disableUser(userId) {
+    try {
       const user = await this.getUserById(userId);
 
       if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-        this.logInfo("disableUser", `Cannot disable user with role: ${user.role}`, { userId });
+        this.logger?.info({
+          module: "UserService",
+          fn: "disableUser",
+          message: `Cannot disable user with role: ${user.role}`,
+          userId,
+        });
         return null;
       }
 
-      const disabledUser = await this.userRepository.toggleUserEnabled(userId);
-      this.logInfo("disableUser", "User disabled successfully", { userId });
+      const disabledUser = await this.userRepository.toggleUserEnabled(parseInt(userId));
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "disableUser",
+        message: "User disabled successfully",
+        userId,
+      });
+
       return disabledUser;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "disableUser",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  removeUser(userId) {
-    return this.wrapAsync("removeUser", async () => {
-      const deleted = await this.userRepository.deleteUser(userId);
-      this.logInfo("removeUser", "User deleted successfully", { userId });
+  async removeUser(userId) {
+    try {
+      const deleted = await this.userRepository.deleteUser(parseInt(userId));
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "removeUser",
+        message: "User deleted successfully",
+        userId: userId,
+      });
+
       return deleted;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "removeUser",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
-  getAdmins() {
-    return this.wrapAsync("getAdmins", async () => {
+  async getAdmins() {
+    try {
       const admins = await this.userRepository.getAdmins();
-      this.logInfo("getAdmins", "Fetched all admins", { count: admins.length });
+
+      this.logger?.info({
+        module: "UserService",
+        fn: "getAdmins",
+        message: "Fetched all admins",
+        count: admins.length,
+      });
+
       return admins;
-    });
+    } catch (error) {
+      this.logger?.error({
+        module: "UserService",
+        fn: "getAdmins",
+        message: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 }
 
