@@ -1,33 +1,25 @@
 class ProductRepository {
   constructor(prismaClient) {
     this.prisma = prismaClient;
-    this.productIncludes = {
-      pictures: true,
-      addedBy: { select: { id: true } },
-    };
   }
 
   async createProduct(data) {
-    const prepared = {
-      ...data,
-      price: data.price !== undefined ? parseFloat(data.price) : undefined,
-      quantity:
-        data.quantity !== undefined ? parseInt(data.quantity, 10) : undefined,
-      addedById:
-        data.addedById !== undefined ? parseInt(data.addedById, 10) : undefined,
-    };
-
-    const product = await this.prisma.product.create({ data: prepared });
-    return product;
+    try {
+      return await this.prisma.product.create({ data });
+    } catch (error) {
+      throw new Error("Failed to create product");
+    }
   }
 
-  async getProductById(productId) {
-    const id = parseInt(productId, 10);
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: this.productIncludes,
-    });
-    return product;
+  async getProductById(id) {
+    try {
+      return await this.prisma.product.findUnique({
+        where: { id },
+        include: { pictures: true, addedBy: { select: { id: true } } },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch product by ID");
+    }
   }
 
   async getAllProducts({
@@ -39,97 +31,102 @@ class ProductRepository {
     search,
     isFeatured,
   } = {}) {
-    const filters = {
-      ...(category && { category }),
-      ...(search && {
-        OR: [
-          { name: { contains: search } }
-        ],
-      }),
-      ...(minPrice || maxPrice
-        ? {
-            price: {
-              ...(minPrice && { gte: Number(minPrice) }),
-              ...(maxPrice && { lte: Number(maxPrice) }),
-            },
-          }
-        : {}),
-      ...(isFeatured !== undefined && { isFeatured: isFeatured === "true" }), // 👈 fix
-    };
+    try {
+      const filters = {
+        ...(category && { category }),
+        ...(search && { OR: [{ name: { contains: search } }] }),
+        ...(minPrice || maxPrice
+          ? {
+              price: {
+                ...(minPrice && { gte: Number(minPrice) }),
+                ...(maxPrice && { lte: Number(maxPrice) }),
+              },
+            }
+          : {}),
+        ...(isFeatured !== undefined && { isFeatured: isFeatured === "true" }),
+      };
 
-    const [products, totalCount, priceRange, categories] = await Promise.all([
-      this.prisma.product.findMany({
-        where: filters,
+      const [products, totalCount, priceRange, categories] = await Promise.all([
+        this.prisma.product.findMany({
+          where: filters,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            price: true,
+            pictures: {
+              where: { isThumbnail: true },
+              select: { url: true },
+            },
+          },
+        }),
+        this.prisma.product.count({ where: filters }),
+        this.prisma.product.aggregate({
+          _min: { price: true },
+          _max: { price: true },
+        }),
+        this.prisma.product.findMany({
+          select: { category: true },
+          distinct: ["category"],
+        }),
+      ]);
+
+      return {
+        products,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit),
+        },
+        filters: {
+          min: priceRange._min.price,
+          max: priceRange._max.price,
+          categories: categories.map((c) => c.category),
+        },
+      };
+    } catch (error) {
+      throw new Error("Failed to fetch products");
+    }
+  }
+
+  async updateProduct(id, data) {
+    try {
+      return await this.prisma.product.update({
+        where: { id },
+        data,
+      });
+    } catch (error) {
+      throw new Error("Failed to update product");
+    }
+  }
+
+  async deleteProduct(id) {
+    try {
+      return await this.prisma.product.delete({ where: { id } });
+    } catch (error) {
+      throw new Error("Failed to delete product");
+    }
+  }
+
+  async getProductsByUser(id, { page = 1, limit = 10 } = {}) {
+    try {
+      page = parseInt(page, 10);
+      limit = parseInt(limit, 10);
+
+      return await this.prisma.product.findMany({
+        where: { addedById: id },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          name: true,
-          category: true,
-          price: true,
-          pictures: {
-            where: { isThumbnail: true },
-            select: { url: true },
-          },
-        },
-      }),
-      this.prisma.product.count({ where: filters }),
-      this.prisma.product.aggregate({
-        _min: { price: true },
-        _max: { price: true },
-      }),
-      this.prisma.product.findMany({
-        select: { category: true },
-        distinct: ["category"],
-      }),
-    ]);
-
-    return {
-      products,
-      pagination: {
-        total: totalCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit),
-      },
-      filters: {
-        min: priceRange._min.price,
-        max: priceRange._max.price,
-        categories: categories.map((c) => c.category),
-      },
-    };
-  }
-
-  async updateProduct(productId, data) {
-    const id = parseInt(productId, 10);
-    const updated = await this.prisma.product.update({
-      where: { id },
-      data,
-      include: this.productIncludes,
-    });
-    return updated;
-  }
-
-  async deleteProduct(productId) {
-    const id = parseInt(productId, 10);
-    const deleted = await this.prisma.product.delete({ where: { id } });
-    return deleted;
-  }
-
-  async getProductsByUser(userId, { page = 1, limit = 10 } = {}) {
-    const id = parseInt(userId, 10);
-    page = parseInt(page, 10);
-    limit = parseInt(limit, 10);
-
-    const products = await this.prisma.product.findMany({
-      where: { addedById: id },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: this.productIncludes,
-    });
-    return products;
+        include: { pictures: true, addedBy: { select: { id: true } } },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch products by user");
+    }
   }
 }
 

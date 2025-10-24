@@ -3,20 +3,30 @@ class InvoiceRepository {
     this.prisma = prisma;
   }
 
-  createInvoice(invoiceData) {
-    return this.prisma.invoice.create({
-      data: invoiceData,
-    });
+  async createInvoice(data) {
+    try {
+      return await this.prisma.invoice.create({ data });
+    } catch (error) {
+      throw new Error("Failed to create invoice");
+    }
   }
 
-  getInvoiceByOrderId(orderId) {
-    return this.prisma.invoice.findUnique({
-      where: { orderId },
-    });
+  async getInvoiceByOrderId(orderId) {
+    try {
+      return await this.prisma.invoice.findUnique({
+        where: { orderId },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch invoice by order ID");
+    }
   }
 
-  getAllInvoices() {
-    return this.prisma.invoice.findMany();
+  async getAllInvoices() {
+    try {
+      return await this.prisma.invoice.findMany();
+    } catch (error) {
+      throw new Error("Failed to fetch all invoices");
+    }
   }
 }
 

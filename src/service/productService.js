@@ -57,10 +57,13 @@ class ProductService {
 
   async createProduct(data, pictures, thumbnail) {
     try {
+      data.price = parseFloat(data.price);
+      data.quantity = parseInt(data.quantity);
+      data.addedById = parseInt(data.addedById);
       const product = await this.productRepository.createProduct(data);
       await this.handlePictures(
         parseInt(product.id),
-        parseInt(data.addedById),
+        data.addedById,
         pictures,
         thumbnail
       );
@@ -146,7 +149,12 @@ class ProductService {
         }
       }
 
-      await this.handlePictures(parseInt(productId), parseInt(addedById), pictures, thumbnail);
+      await this.handlePictures(
+        parseInt(productId),
+        parseInt(addedById),
+        pictures,
+        thumbnail
+      );
 
       const updated = await this.productRepository.updateProduct(
         parseInt(productId),
@@ -155,7 +163,7 @@ class ProductService {
 
       this.logger?.info({
         module: "ProductService",
-        fn:"updateProduct",
+        fn: "updateProduct",
         message: "Product updated successfully",
         productId: productId,
       });
@@ -226,15 +234,20 @@ class ProductService {
 
   async updateProductQuantity(productId, quantityOrdered) {
     try {
-      const product = await this.productRepository.getProductById(parseInt(productId));
+      const product = await this.productRepository.getProductById(
+        parseInt(productId)
+      );
       if (!product) throw new Error(`Product with ID ${productId} not found`);
 
       const newQuantity = product.quantity - quantityOrdered;
       if (newQuantity < 0) throw new Error("Quantity cannot be negative");
 
-      const updated = await this.productRepository.updateProduct(parseInt(productId), {
-        quantity: newQuantity,
-      });
+      const updated = await this.productRepository.updateProduct(
+        parseInt(productId),
+        {
+          quantity: newQuantity,
+        }
+      );
 
       this.logger?.info({
         module: "ProductService",
@@ -257,7 +270,6 @@ class ProductService {
   }
 
   async getProductsByIds(productIds) {
-    const fn = "getProductsByIds";
     try {
       const products = [];
       for (const id of productIds) {
@@ -267,7 +279,7 @@ class ProductService {
 
       this.logger?.info({
         module: "ProductService",
-        fn,
+        fn: "getProductsByIds",
         message: "Fetched products by IDs",
         count: products.length,
       });
@@ -276,7 +288,7 @@ class ProductService {
     } catch (error) {
       this.logger?.error({
         module: "ProductService",
-        fn,
+        fn: "getProductsByIds",
         message: error.message,
         stack: error.stack,
       });

@@ -6,7 +6,7 @@ import UserService from "./service/userService.js";
 import UserController from "./controller/userController.js";
 
 import AuthRepository from "./repository/authRepository.js";
-import AuthService from "./service/authService.js"; 
+import AuthService from "./service/authService.js";
 import AuthController from "./controller/authController.js";
 
 import ProductRepository from "./repository/productRepository.js";
@@ -54,12 +54,12 @@ const pictureService = new PictureService(
 const pictureController = new PictureController(pictureService, logger);
 
 const userRepository = new UserRepository(prisma);
-const userService = new UserService(userRepository, emailService, logger);
+const userService = new UserService(userRepository, logger);
 const userController = new UserController(userService, logger);
 
 const authRepository = new AuthRepository(prisma);
-const authService = new AuthService(authRepository,emailService,logger);
-const authController = new AuthController(authService,logger);
+const authService = new AuthService(authRepository, emailService, logger);
+const authController = new AuthController(authService, logger);
 
 const productRepository = new ProductRepository(prisma);
 const productService = new ProductService(
@@ -70,14 +70,30 @@ const productService = new ProductService(
 const productController = new ProductController(productService, logger);
 
 const orderDetailsRepository = new OrderDetailsRepository(prisma);
-const orderDetailsService = new OrderDetailsService(logger,orderDetailsRepository);
+const orderDetailsService = new OrderDetailsService(
+  orderDetailsRepository,
+  logger
+);
 
 const orderRepository = new OrderRepository(prisma);
-const orderService = new OrderService(orderRepository,logger,fileUploadLib,orderDetailsService,productService,emailService,userService);
-const orderController = new OrderController(orderService,logger);
+const orderService = new OrderService(
+  orderRepository,
+  logger,
+  fileUploadLib,
+  orderDetailsService,
+  productService,
+  emailService,
+  userService
+);
+const orderController = new OrderController(orderService, logger);
 
 const invoiceRepository = new InvoiceRepository(prisma);
-const invoiceService = new InvoiceService(invoiceRepository, orderService, fileUploadLib, logger);
+const invoiceService = new InvoiceService(
+  invoiceRepository,
+  orderService,
+  fileUploadLib,
+  logger
+);
 
 orderService.setInvoiceService(invoiceService);
 
@@ -89,5 +105,5 @@ export {
   orderController,
   userValidator,
   productValidator,
-  orderValidator
+  orderValidator,
 };

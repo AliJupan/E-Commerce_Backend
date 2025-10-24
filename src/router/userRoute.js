@@ -10,7 +10,6 @@ const userRoutes = (
   superAdminMiddleware,
   userValidator
 ) => {
-  // 🔹 Get all users (Admin or Super Admin)
   router.get(
     "/",
     authenticationMiddleware.authenticate(),
@@ -18,7 +17,6 @@ const userRoutes = (
     userController.getAllUsers()
   );
 
-  // 🔹 Get single user by ID (Authorized)
   router.get(
     "/:id",
     authenticationMiddleware.authenticate(),
@@ -26,16 +24,6 @@ const userRoutes = (
     userController.getUserById()
   );
 
-  // 🔹 Update user (Authorized)
-  router.put(
-    "/update/:id",
-    authenticationMiddleware.authenticate(),
-    userMiddleware.authorize(),
-    userValidator.validateUpdateUser(),
-    userController.updateUser()
-  );
-
-  // 🔹 Promote user to Super Admin (Only Super Admins)
   router.put(
     "/make-super-admin/:id",
     authenticationMiddleware.authenticate(),
@@ -43,7 +31,6 @@ const userRoutes = (
     userController.promoteToSuperAdmin()
   );
 
-  // 🔹 Disable user (Admin or Super Admin)
   router.put(
     "/disable/:id",
     authenticationMiddleware.authenticate(),
@@ -51,7 +38,6 @@ const userRoutes = (
     userController.disableUser()
   );
 
-  // 🔹 Delete user (Only Super Admins)
   router.delete(
     "/:id",
     authenticationMiddleware.authenticate(),

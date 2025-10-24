@@ -8,21 +8,18 @@ const authRoutes = (
   userMiddleware,
   userValidator
 ) => {
-  // 🔹 Register new user
   router.post(
     "/register",
     userValidator.validateUserRegistration(),
     authController.register()
   );
 
-  // 🔹 Login existing user
   router.post(
     "/login",
     userValidator.validateUserLogin(),
     authController.login()
   );
 
-  // 🔹 Get profile of authenticated user
   router.get(
     "/profile/me",
     authenticationMiddleware.authenticate(),
@@ -30,17 +27,21 @@ const authRoutes = (
     authController.getUserById()
   );
 
-  // 🔹 Forgot password (send reset email)
+  router.put(
+    "/update/me",
+    authenticationMiddleware.authenticate(),
+    userMiddleware.authorize(),
+    authController.updateUser()
+  );
+
   router.post("/forgot-password", authController.forgotPassword());
 
-  // 🔹 Reset password (authenticated)
   router.put(
     "/reset-password",
     authenticationMiddleware.authenticate(),
     authController.resetPassword()
   );
 
-  // 🔹 Change password (verify email from token)
   router.put(
     "/change-password",
     authenticationMiddleware.authenticate(),

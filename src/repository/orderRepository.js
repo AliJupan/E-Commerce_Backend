@@ -4,111 +4,125 @@ class OrderRepository {
   }
 
   async createOrder(data) {
-    return this.prisma.order.create({
-      data,
-      include: {
-        orderDetails: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                category: true,
+    try {
+      return await this.prisma.order.create({
+        data,
+        include: {
+          orderDetails: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  category: true,
+                },
               },
             },
           },
+          invoice: true,
         },
-        invoice: true,
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error("Failed to create order");
+    }
   }
 
   async getOrderById(id) {
-    return this.prisma.order.findUnique({
-      where: { id: parseInt(id, 10) },
-      include: {
-        orderDetails: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                category: true,
+    try {
+      return await this.prisma.order.findUnique({
+        where: { id },
+        include: {
+          orderDetails: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  category: true,
+                },
               },
             },
           },
+          invoice: true,
         },
-        invoice: true,
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch order by ID");
+    }
   }
 
   async getOrdersByUserId(userId) {
-    return this.prisma.order.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        orderDetails: {
-          include: {
-            product: {
-              select: { id: true, name: true, price: true, category: true },
+    try {
+      return await this.prisma.order.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          orderDetails: {
+            include: {
+              product: {
+                select: { id: true, name: true, price: true, category: true },
+              },
             },
           },
+          invoice: true,
         },
-        invoice: true,
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch orders for user");
+    }
   }
 
   async getAllOrders() {
-    return this.prisma.order.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        orderDetails: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                category: true,
+    try {
+      return await this.prisma.order.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          orderDetails: {
+            include: {
+              product: {
+                select: { id: true, name: true, price: true, category: true },
               },
             },
           },
+          invoice: true,
         },
-        invoice: true,
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch all orders");
+    }
   }
 
   async updateOrder(id, data) {
-    return this.prisma.order.update({
-      where: { id: parseInt(id, 10) },
-      data,
-      include: {
-        orderDetails: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                category: true,
+    try {
+      return await this.prisma.order.update({
+        where: { id },
+        data,
+        include: {
+          orderDetails: {
+            include: {
+              product: {
+                select: { id: true, name: true, price: true, category: true },
               },
             },
           },
+          invoice: true,
         },
-        invoice: true,
-      },
-    });
+      });
+    } catch (error) {
+      throw new Error("Failed to update order");
+    }
   }
 
   async deleteOrder(id) {
-    return this.prisma.order.delete({
-      where: { id: parseInt(id, 10) },
-    });
+    try {
+      return await this.prisma.order.delete({
+        where: { id },
+      });
+    } catch (error) {
+      throw new Error("Failed to delete order");
+    }
   }
 }
 

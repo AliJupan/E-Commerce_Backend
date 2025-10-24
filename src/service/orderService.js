@@ -1,13 +1,13 @@
 class OrderService {
   constructor(
     orderRepository,
+    logger,
     fileUploadLib,
     orderDetailsService,
     productService,
     emailService,
     userService,
-    invoiceService,
-    logger
+    invoiceService
   ) {
     this.orderRepository = orderRepository;
     this.fileUploadLib = fileUploadLib;
@@ -124,7 +124,7 @@ class OrderService {
       });
       return order;
     } catch (error) {
-      this.logger?.error({
+      this.logger.error({
         module: "OrderService",
         fn: "createOrder",
         message: error.message,
@@ -288,6 +288,10 @@ class OrderService {
       });
       throw error;
     }
+  }
+
+  setInvoiceService(invoiceService) {
+    this.invoiceService = invoiceService;
   }
 }
 

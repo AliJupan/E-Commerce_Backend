@@ -4,63 +4,74 @@ class PictureRepository {
   }
 
   async createPicture(data) {
-    const picture = await this.prisma.picture.create({ data });
-    return picture;
+    try {
+      return await this.prisma.picture.create({ data });
+    } catch (error) {
+      throw new Error("Failed to create picture");
+    }
   }
 
-  async getPictureById(pictureId) {
-    const id = parseInt(pictureId, 10);
-    const picture = await this.prisma.picture.findUnique({ where: { id } });
-    return picture;
+  async getPictureById(id) {
+    try {
+      return await this.prisma.picture.findUnique({ where: { id } });
+    } catch (error) {
+      throw new Error("Failed to fetch picture by ID");
+    }
   }
 
-  async getPicturesByProductId(productId) {
-    const id = parseInt(productId, 10);
-    const pictures = await this.prisma.picture.findMany({
-      where: { productId: id },
-      orderBy: { uploadedAt: "asc" },
-    });
-    return pictures;
+  async getPicturesByProductId(id) {
+    try {
+      return await this.prisma.picture.findMany({
+        where: { productId: id },
+        orderBy: { uploadedAt: "asc" },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch pictures by product ID");
+    }
   }
 
-  async getThumbnailByProductId(productId) {
-    const id = parseInt(productId, 10);
-    const pictures = await this.prisma.picture.findMany({
-      where: { productId: id, isThumbnail: true },
-      orderBy: { uploadedAt: "asc" },
-    });
-    return pictures;
+  async getThumbnailByProductId(id) {
+    try {
+      return await this.prisma.picture.findMany({
+        where: { productId: id, isThumbnail: true },
+        orderBy: { uploadedAt: "asc" },
+      });
+    } catch (error) {
+      throw new Error("Failed to fetch thumbnail by product ID");
+    }
   }
 
-  async toggleIsThumbnail(pictureId) {
-    const id = parseInt(pictureId, 10);
-    const picture = await this.prisma.picture.findUnique({
-      where: { id },
-      select: { isThumbnail: true, productId: true },
-    });
-    if (!picture) return null;
+  async toggleIsThumbnail(id) {
+    try {
+      const picture = await this.prisma.picture.findUnique({
+        where: { id },
+        select: { isThumbnail: true, productId: true },
+      });
+      if (!picture) return null;
 
-    // Toggle the current picture's isThumbnail
-    const updated = await this.prisma.picture.update({
-      where: { id },
-      data: { isThumbnail: !picture.isThumbnail },
-    });
-
-    return updated;
+      return await this.prisma.picture.update({
+        where: { id },
+        data: { isThumbnail: !picture.isThumbnail },
+      });
+    } catch (error) {
+      throw new Error("Failed to toggle thumbnail status");
+    }
   }
 
-  async deletePicture(pictureId) {
-    const id = parseInt(pictureId, 10);
-    const deleted = await this.prisma.picture.delete({ where: { id } });
-    return deleted;
+  async deletePicture(id) {
+    try {
+      return await this.prisma.picture.delete({ where: { id } });
+    } catch (error) {
+      throw new Error("Failed to delete picture");
+    }
   }
 
-  async deletePicturesByProductId(productId) {
-    const id = parseInt(productId, 10);
-    const deleted = await this.prisma.picture.deleteMany({
-      where: { productId: id },
-    });
-    return deleted;
+  async deletePicturesByProductId(id) {
+    try {
+      return await this.prisma.picture.deleteMany({ where: { productId: id } });
+    } catch (error) {
+      throw new Error("Failed to delete pictures by product ID");
+    }
   }
 }
 

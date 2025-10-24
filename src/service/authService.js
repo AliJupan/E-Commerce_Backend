@@ -9,10 +9,11 @@ class AuthService {
     this.logger = logger;
   }
 
-  // Register a user
   async register(data) {
     try {
-      const existingUser = await this.authRepository.findUserByEmail(data.email);
+      const existingUser = await this.authRepository.findUserByEmail(
+        data.email
+      );
       if (existingUser) {
         this.logger.error({
           module: "AuthService",
@@ -37,7 +38,11 @@ class AuthService {
       const user = await this.authRepository.createUser(data);
 
       if (user && generatedPassword) {
-        await this.emailService.sendRandomPassword(user.email, user.name, generatedPassword);
+        await this.emailService.sendRandomPassword(
+          user.email,
+          user.name,
+          generatedPassword
+        );
       }
 
       this.logger.info({
@@ -59,10 +64,12 @@ class AuthService {
     }
   }
 
-  // Login a user
   async login(email, password, req) {
     try {
-      const ip = req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress;
+      const ip =
+        req.ip ||
+        req.headers["x-forwarded-for"] ||
+        req.connection?.remoteAddress;
       const userAgent = req.headers["user-agent"];
 
       const user = await this.authRepository.findUserByEmail(email);
@@ -134,6 +141,35 @@ class AuthService {
     }
   }
 
+  async updateUser(id, data) {
+    try {
+      if (data.password) {
+        data.password = await bcrypt.hash(data.password, 10);
+      }
+      const updatedUser = await this.authRepository.updateUser(
+        parseInt(id),
+        data
+      );
+
+      this.logger.info({
+        module: "AuthService",
+        fn: "updateUser",
+        message: "User updated successfully",
+        id,
+      });
+
+      return updatedUser;
+    } catch (error) {
+      this.logger.error({
+        module: "AuthService",
+        fn: "updateUser",
+        message: error.message,
+        id,
+      });
+      throw error;
+    }
+  }
+
   async getUserByEmail(email) {
     try {
       const user = await this.authRepository.findUserByEmail(email);
@@ -162,7 +198,9 @@ class AuthService {
       const user = await this.authRepository.findUserByEmail(email);
       if (!user) throw new Error(`Email not found: ${email}`);
 
-      const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY, { expiresIn: "24h" });
+      const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY, {
+        expiresIn: "24h",
+      });
       await this.emailService.sendForgotPasswordMail(email, resetToken);
 
       this.logger.info({
@@ -191,7 +229,10 @@ class AuthService {
       if (!userId) throw new Error("Invalid token");
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      const updated = await this.authRepository.resetUserPassword(userId, hashedPassword);
+      const updated = await this.authRepository.resetUserPassword(
+        userId,
+        hashedPassword
+      );
 
       this.logger.info({
         module: "AuthService",
@@ -220,7 +261,10 @@ class AuthService {
       if (!isMatch) throw new Error("Invalid email or password");
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      const updated = await this.authRepository.updateUserPassword(email, hashedPassword);
+      const updated = await this.authRepository.updateUserPassword(
+        email,
+        hashedPassword
+      );
 
       this.logger.info({
         module: "AuthService",
